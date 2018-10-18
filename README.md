@@ -89,7 +89,7 @@ Prepare the development environment by installing ADB and the compiler/tools.  E
 ## Install the azIoTClient  source code
 1. Move to the directory that is the root of your development work.
 
-2. Clone the M18qxAzureIoT code by executing: **'git clone https://github.com/Avnet/M18QxAzureIoT'**
+2. Clone the M18qxAzureIoT code by executing: **'git clone --recurse-submodules https://github.com/jflynn129/M18QxAzureIoT'**
 
 3. Go to the  newly cloned directory (**M18QxAzureIoT**)
 
