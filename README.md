@@ -1,5 +1,5 @@
 ﻿# M18QxAzureIoT
-Azure IoT Client example program uses the Avnet M18Qx System On a Module (SOM)--*I use the acronym M18Qx when referring to the board in this README*.  The example program demonstrates connecting to Microsoft Azure IoT Hub, sending telemetry data and receiving commands/messages.  If used with the Avnet LTE IoT Breakout Carrier, Click Modules can be added and sensor readings from those modules will be sent also (currently it is only supports the **Temp&Humidity Click** and the **Barometer Click**).
+Azure IoT Client example program uses the Avnet M18Qx System On a Module (SOM)--*I use the acronym M18Qx when referring to the board in this README*.  The example program demonstrates connecting to Microsoft Azure IoT Hub, sending telemetry data and receiving commands/messages.  If used with the Avnet LTE IoT Breakout Carrier, Click Modules can be added and sensor readings from those modules will be sent also (currently it is only supports the **Temp&Humidity Click (https://www.mikroe.com/temp-hum-click)** and the **Barometer Click (https://www.mikroe.com/barometer-click)**).
 
 The example is capable of running in a standalone configuration (only power required) but to load and interact with the board an ADB (Android Debug Bridge) session must be used.  If using an ADB session, the following is the startup screen that is displayed. 
 
@@ -22,7 +22,7 @@ When started, the example program (*referred to as azIoTClient*) performs the fo
 
  - The Modem Abstraction Layer to the M18Qx is started 
  - Device Information (i.e., ICCID and IMEI) is collected 
- - Any Click Modules that are connected are discovered 
+ - Any Supported Click Modules that are connected are discovered 
  - A cellular connection is established and time obtained from *ntp.org*
 
 After these tasks, azIoTClient begins iteratively sending sensor telemetry to the Azure IoT Hub. This behavior continues until you depress the USR button for >3 seconds at which time azIoTClient terminates.  The messages that are sent are similar to:
@@ -98,6 +98,8 @@ Prepare the development environment by installing ADB and the compiler/tools.  E
 5. run autogen: **./autogen.sh**
 
 6. run configure: **"./configure ${CONFIGURE_FLAGS}"**
+
+7. Modify **azClientFuncts.cpp** (line 26) and replace *connectionString* with the connection string for your Device.
 
 The tools and source code are now installed and you can compile the code by typing: **"make"**
 
