@@ -269,7 +269,7 @@ int main(int argc, char *argv[])
             }
         }
 
-    status_led.action(Led::LED_EXIT,Led::CURRENT);
+    status_led.action(Led::LED_ON,Led::BLACK);
 
     printf(" - - - - - - - ALL DONE - - - - - - - \n");
     exit(EXIT_SUCCESS);

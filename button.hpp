@@ -22,6 +22,8 @@ extern "C" {
 }
 #endif // __HWLIB__
 
+#include <pthread.h>
+#include <signal.h>
 #include "foa.h"
 
 #pragma GCC diagnostic ignored "-Wpmf-conversions"
@@ -34,33 +36,17 @@ class Button {
         void            (*br_cb)(int);    //button release callback
         void            (*bp_cb)(void);   //button press callback
         bool            button_press;
+        bool            pin_state;
         gpio_pin_t      gpio_pin;         //caller specified gpio pin to use
+        pthread_cond_t  button_wait;
+        pthread_mutex_t button_mutex;                                                          
+        pthread_t       button_thread;
+        static void     *button_handler_thread(void* obj);
 
         int irq_callback(gpio_pin_t pin_state, gpio_irq_trig_t direction) {
             Button* obj = (Button*)foa_find((int (*)(_gpio_pin_e, _gpio_irq_trig_e))&Button::irq_callback);
-            return button_handler(obj, pin_state, direction);
-            }
-
-        int button_handler(Button *data, gpio_pin_t pin_state, gpio_irq_trig_t direction) {
-            struct timespec keypress_duration;
-
-	    if (!pin_state) {
-                data->button_press = true;
-                clock_gettime(CLOCK_MONOTONIC, &data->key_press);
-                if( data->bp_cb )
-                    data->bp_cb();
-                }
-            else {
-                data->button_press = false;
-                clock_gettime(CLOCK_MONOTONIC, &data->key_release);
-                if ((data->key_release.tv_nsec - data->key_press.tv_nsec)<0) 
-                    keypress_duration.tv_sec = data->key_release.tv_sec - data->key_press.tv_sec-1;
-                else 
-                    keypress_duration.tv_sec = data->key_release.tv_sec - data->key_press.tv_sec;
-   
-                if( data->br_cb )
-                    data->br_cb(keypress_duration.tv_sec);
-                }
+            obj->pin_state = (bool)pin_state;
+            pthread_cond_signal(&obj->button_wait);
             return 0;
             }
 
@@ -73,6 +59,10 @@ class Button {
             gpio_pin=the_gpio;
             gpio_init( gpio_pin,  &user_key );  //SW3
             gpio_dir(user_key, GPIO_DIR_INPUT);
+
+            pthread_mutex_init(&button_mutex, NULL);
+            pthread_cond_init(&button_wait, NULL);
+            pthread_create(&button_thread, NULL, button_handler_thread, (void*)this);
 
             foa_insert((void*)this, (int (*)(_gpio_pin_e, _gpio_irq_trig_e))&Button::irq_callback);
             gpio_irq_request(user_key, GPIO_IRQ_TRIG_BOTH, (int (*)(_gpio_pin_e, _gpio_irq_trig_e))&Button::irq_callback);
