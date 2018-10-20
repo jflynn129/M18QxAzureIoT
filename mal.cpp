@@ -43,7 +43,7 @@ int Mal::send_mal_command(char *json_cmd, char *json_resp, int len_json_resp, ui
     struct sockaddr_un addr;
 
     while( pthread_mutex_trylock(&mal_mutex) ) 
-        sleep(1);
+        pthread_yield();
 
     strcpy(addr.sun_path, JSON_SOCKET_ADDR);    // max 108 bytes
     addr.sun_family = AF_UNIX;

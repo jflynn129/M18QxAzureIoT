@@ -62,7 +62,7 @@ class Led {
 
         Color color( Color color ) {
             while( pthread_mutex_trylock(&led_mutex) )
-                /* wait */;
+                pthread_yield();
             if( color != CURRENT )
                 led_color=color;
             pthread_mutex_unlock(&led_mutex);
@@ -73,7 +73,7 @@ class Led {
             if( led_action == LOCK && act != UNLOCK )
                 return led_action;
             while( pthread_mutex_trylock(&led_mutex) )
-                /* wait */;
+                pthread_yield();
             Action last_action = led_action;
             led_action=act;
             if( act == LOCK )
@@ -87,7 +87,7 @@ class Led {
             if( led_action == LOCK && act != UNLOCK )
                 return led_action;
             while( pthread_mutex_trylock(&led_mutex) )
-                /* wait */;
+                pthread_yield();
             Action last_action = led_action;
             led_action=act;
             if( act == LOCK )
@@ -128,7 +128,7 @@ class Led {
 
             while ( !(self->led_action & LED_EXIT) ) {
                 while( pthread_mutex_trylock(&self->led_mutex) )
-                    /* wait */;
+                    pthread_yield();
                 if( self->led_action == NONE || self->led_action == LOCK || self->led_action == UNLOCK)
                     /* do nothing */;
                 else if( self->led_action == LED_OFF ) 

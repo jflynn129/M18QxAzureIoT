@@ -31,10 +31,9 @@ libarmtls.a:
 clean-generic:
 	-$(MAKE) -C mbedtls clean
 
-azIoTClient_SOURCES = azIoTClient.cpp foa.cpp button.hpp led.hpp lis2dw12.hpp \
-                      mal.cpp mal.hpp gps.hpp jsmn.c devinfo.hpp i2c_interface.cpp \
-                      i2c_interface.hpp i2c.hpp hts221.cpp azClientFuncs.cpp \
-                      azure_certs.c prettyjson.cpp wwan.hpp
+azIoTClient_SOURCES = azIoTClient.cpp foa.cpp mal.cpp jsmn.c i2c_interface.cpp \
+                      hts221.cpp azClientFuncs.cpp azure_certs.c prettyjson.cpp\
+                      lis2dw12.cpp button.cpp gps.cpp
 
 noinst_LIBRARIES = libmsft_azure_iot_sdk.a libarmtls.a 
 

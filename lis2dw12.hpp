@@ -6,6 +6,7 @@
 #ifndef __LIS2DW12_HPP__
 #define __LIS2DW12_HPP__
 
+#include <signal.h>
 #include "i2c.hpp"
 #include "foa.h"
 
@@ -22,7 +23,7 @@ class Lis2dw12 {
             int2_pin_state(GPIO_LEVEL_LOW), 
             temp_updated(false),
             last_position(FACE_UP), 
-            moved(false) 
+            moved(false)
             {
             gpio_init(int1_gpio, &int1_pin);
             gpio_init(int2_gpio, &int2_pin);
@@ -30,6 +31,10 @@ class Lis2dw12 {
             gpio_dir(int2_pin, GPIO_DIR_OUTPUT);  //generates interrupt to lis2dw12
             gpio_write( int2_pin,  GPIO_LEVEL_LOW );
     
+            pthread_mutex_init(&mutex, NULL);
+            pthread_cond_init(&wait, NULL);
+            pthread_create(&lis2dw12_irq_thread, NULL, lis2dw12_int1_thread, (void*)this);
+
             foa_insert((void*)this, (int (*)(_gpio_pin_e, _gpio_irq_trig_e))&Lis2dw12::int1_irq_callback);
             gpio_irq_request(int1_pin, GPIO_IRQ_TRIG_RISING, (int (*)(_gpio_pin_e, _gpio_irq_trig_e))&Lis2dw12::int1_irq_callback);
 
@@ -46,28 +51,7 @@ class Lis2dw12 {
             gpio_deinit( &int2_pin);
             }
 
-        float lis2dw12_getTemp( void ) {
-            float   tempC, tempF;
-            uint8_t low=0, high=0, hp=0;
-            int     i;
-
-            lis2dw12_write_byte(0x3f, 0x00);          // CTRL7: disable interrupts
-            lis2dw12_write_byte(0x22, 0x03);          // CTRL3: Enable Single data conversion on command
-            while( lis2dw12_read_byte(0x22) & 0x01) 
-                sleep(1);
-            lis2dw12_write_byte(0x22, 0x00);          // CTRL3: Enable Single data controlled by INT2
-            lis2dw12_write_byte(0x3f, 0x20);          // CTRL7: enable interrupts
-
-            hp= lis2dw12_read_byte(0x20) & 0x04; //get performance setting
-            low = lis2dw12_read_byte(0x0d);
-            high= lis2dw12_read_byte(0x0e);
-            i = byte2int(high,low, hp);
-
-            tempC = (float)(i/16.0) + 25.0;
-            tempF = (tempC*9.0)/5.0 + 32;
-            return tempF;
-            }
-
+        float lis2dw12_getTemp( void );
         position lis2dw12_getPosition(void) {
             return last_position;
             }
@@ -82,6 +66,15 @@ class Lis2dw12 {
             return move;
             }
 
+    protected:
+        int int1_irq_callback(gpio_pin_t pin_state, gpio_irq_trig_t direction) {
+            Lis2dw12* obj = (Lis2dw12*)foa_find((int (*)(_gpio_pin_e, _gpio_irq_trig_e))&Lis2dw12::int1_irq_callback);
+            pthread_cond_signal(&obj->wait);
+            return 0;
+            }
+    
+        static void lis2dw12_int1_irq_thread(void* data);
+
     private:
         i2c                    lis2dw12_i2c;
         volatile gpio_level_t  int2_pin_state;
@@ -89,6 +82,10 @@ class Lis2dw12 {
         volatile bool          temp_updated;
         position               last_position;
         bool                   moved;
+        pthread_cond_t         wait;
+        pthread_mutex_t        mutex;                                                          
+        pthread_t              lis2dw12_irq_thread;
+        static void            *lis2dw12_int1_thread(void* obj);
 
         inline uint8_t lis2dw12_read_byte(uint8_t reg_addr) {
             return lis2dw12_i2c.read(reg_addr);
@@ -107,33 +104,6 @@ class Lis2dw12 {
                 return (long)v >> 4;
             else
                 return (long)v >> 2;
-            }
-
-    protected:
-        int int1_irq_callback(gpio_pin_t pin_state, gpio_irq_trig_t direction) {
-            Lis2dw12* obj = (Lis2dw12*)foa_find((int (*)(_gpio_pin_e, _gpio_irq_trig_e))&Lis2dw12::int1_irq_callback);
-            return lis2dw12_int1_irq(obj, pin_state, direction);
-            }
-    
-        int lis2dw12_int1_irq(Lis2dw12* data, gpio_pin_t pin_name, gpio_irq_trig_t direction) {
-            uint8_t pos=0, stat=0;
-
-            stat = data->lis2dw12_read_byte(0x37);
-            if( stat & 0x04 ) {
-                pos=data->lis2dw12_read_byte(0x3a) & 0b01111111; 
-                if( pos & 0x40 ) {
-                    data->moved = true;
-                    if( pos & 0x40 ) { //detected a change in position
-                        if( pos & 0x30 )  //Z threshold
-                            data->last_position = (((pos>>4)&0x3) == 1)? FACE_UP:FACE_DOWN;
-                        if( pos & 0x0c )  //Y threshold
-                            data->last_position = (((pos>>2)&0x3) == 1)? FACE_RIGHT:FACE_LEFT;
-                        if( pos & 0x03 )  //X threshold
-                            data->last_position = ((pos&0x3) == 1)? FACE_AWAY:FACE_FORWARD;
-                        }
-                    }
-                }
-            return 0;
             }
 
 };
