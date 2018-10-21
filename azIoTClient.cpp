@@ -39,7 +39,6 @@ extern "C" {
 #include "hts221.hpp"
 #include "wwan.hpp"
 
-
 #include "azIoTClient.h"
 
 IOTHUB_CLIENT_LL_HANDLE  setup_azure(void);
@@ -50,7 +49,6 @@ Led::Color   current_color;
 Led::Action  current_action;
 char         imei[25];
 char         iccid[25];
-int          gps_to = 120;        //default is 120 seconds
 int          report_period = 10;  //default to 10 second reports
 bool         verbose = false;     //default to quiet mode
 bool         done = false;        //not yet done
@@ -58,12 +56,12 @@ unsigned int click_modules = 0;   //no Click Modules present
 
 IOTHUB_CLIENT_LL_HANDLE  IoTHub_client_ll_handle;
 
+Wncgps    gps;
 Lis2dw12  mems(GPIO_PIN_6, GPIO_PIN_7);
 Adc       adc;
 Led       status_led(GPIO_PIN_92, GPIO_PIN_102, GPIO_PIN_101);
 Barometer barom(LPS25HB_SAD);
 Hts221    humid(HTS221_SAD);
-Wncgps    gps;
 Button    user_button(GPIO_PIN_98, button_release);
 
 //
@@ -72,7 +70,6 @@ Button    user_button(GPIO_PIN_98, button_release);
 void usage (void)
 {
     printf(" The 'azIoTClient' program can be started with several options:\n");
-    printf(" -g X: Set timeout (sec) for GPS information to be returned\n");
     printf(" -v  : Display Messages as sent.\n");
     printf(" -r X: Set the reporting period in 'X' (seconds)\n");
     printf(" -?  : Display usage info\n");
@@ -96,6 +93,7 @@ void button_release( int dur )
 }
 
 /* Standard Report sent to Azure repeatedly */
+#define MSG_LEN                    512
 #define IOTDEVICE_MSG_FORMAT       \
    "{"                             \
      "\"ObjectName\":\"%s\","      \
@@ -105,6 +103,7 @@ void button_release( int dur )
      "\"DeviceICCID\":\"%s\","     \
      "\"DeviceIMEI\":\"%s\","      \
      "\"ADC_value\":%.02f,"        \
+     "\"last GPS fix\":\"%s\","    \
      "\"lat\":%.02f,"              \
      "\"long\":%.02f,"             \
      "\"Temperature\":%.02f,"      \
@@ -115,39 +114,36 @@ void button_release( int dur )
 
 char* make_message(char* iccid, char* imei)
 {
-    latlong        loc;
-    char           buffer[25], temp[25];
-    const int      len = sizeof(IOTDEVICE_MSG_FORMAT)
-                       + sizeof(REPORTING_OBJECT_NAME)
-                       + sizeof(REPORTING_OBJECT_TYPE)
-                       + sizeof(REPORTING_OBJECT_VERSION)
-                       + sizeof(REPORTING_DEVICE)
-                       + (7*20);
+    gpsstatus *loc;
+    char      buffer[25], temp[25];
+    char*     ptr = (char*)malloc(MSG_LEN);
+    time_t    rawtime;
+    struct tm *ptm;
 
-    char* ptr = (char*)malloc(len);
-
-    time_t      rawtime;
-    struct tm   *ptm;
     time(&rawtime);
     ptm = gmtime(&rawtime);
-    strftime(buffer,80,"%a %F %X",ptm);
-    loc = gps.getLocation(true);
+    strftime(buffer,sizeof(buffer),"%a %F %X",ptm);
 
-    snprintf(ptr, len, IOTDEVICE_MSG_FORMAT, 
-                       REPORTING_OBJECT_NAME,
-                       REPORTING_OBJECT_TYPE,
-                       REPORTING_OBJECT_VERSION,
-                       REPORTING_DEVICE,
-                       iccid,
-                       imei,
-                       (float)adc,
-                       loc.lat,
-                       loc.lng,
-                       mems.lis2dw12_getTemp(),
-                       mems.movement_ocured(),
-                       mems.lis2dw12_getPosition(),
-                       report_period,
-                       buffer);
+    loc = gps.getLocation();
+    ptm = gmtime(&loc->last_good);
+    strftime(temp,sizeof(temp),"%a %F %X",ptm);
+
+    snprintf(ptr, MSG_LEN, IOTDEVICE_MSG_FORMAT, 
+                           REPORTING_OBJECT_NAME,
+                           REPORTING_OBJECT_TYPE,
+                           REPORTING_OBJECT_VERSION,
+                           REPORTING_DEVICE,
+                           iccid,
+                           imei,
+                           (float)adc,
+                           temp,
+                           loc->last_pos.lat,
+                           loc->last_pos.lng,
+                           mems.lis2dw12_getTemp(),
+                           mems.movement_ocured(),
+                           mems.lis2dw12_getPosition(),
+                           report_period,
+                           buffer);
 
     if( click_modules & BAROMETER_CLICK ) {
         snprintf(temp, sizeof(temp), ",\"Barometer\":%.02f", barom.get_pressure());
@@ -174,19 +170,17 @@ int main(int argc, char *argv[])
     Devinfo   device;
     Wwan      wan_led;
     void      prty_json(char* src, int srclen);
+    NTPClient ntp;
+    time_t    timestamp=-1;
 
     status_led.action(Led::LED_ON,Led::RED);
     user_button.button_press_cb( button_press );
 
-    while((i=getopt(argc,argv,"g:vr:?")) != -1 )
+    while((i=getopt(argc,argv,"vr:?")) != -1 )
         switch(i) {
-           case 'g': //set a GPS timeout value
-               sscanf(optarg,"%d",&gps_to);
-               printf(">> GPS Time Out set to %d seconds\n\n",gps_to);
-               break;
            case 'v':
                verbose = true;
-               printf(">> output messages as sent\n\n");
+               printf(">> output messages as sent\n");
                break;
            case 'r':
                sscanf(optarg,"%x",&report_period);
@@ -194,16 +188,17 @@ int main(int argc, char *argv[])
                if( i != 0 )
                    report_period += (REPORT_PERIOD_RESOLUTION-i);
                printf(">> auto update every %d seconds ",report_period);
-               printf("(reports in %dx second increments)\n\n",REPORT_PERIOD_RESOLUTION);
+               printf("(reports in %dx second increments)\n",REPORT_PERIOD_RESOLUTION);
                break;
            case '?':
                usage();
                exit(EXIT_SUCCESS);
            default:
                fprintf (stderr, ">> nknown option character `\\x%x'.\n", optopt);
-               exit(EXIT_SUCCESS);
+               exit(EXIT_FAILURE);
            }
 
+    printf("\n\n");
     printf("     ****\r\n");
     printf("    **  **     Azure IoTClient Example, version %s\r\n", APP_VERSION);
     printf("   **    **    by AVNET\r\n");
@@ -224,10 +219,22 @@ int main(int argc, char *argv[])
     if( click_modules & BAROMETER_CLICK ) printf("Click-Barometer PRESENT!\n");
     if( click_modules & HTS221_CLICK ) printf(   "Click-Temp&Hum  PRESENT!\n\n");
 
-    NTPClient ntp;
-    time_t timestamp=-1;
+    status_led.set_interval(125);
+    status_led.action(Led::LED_BLINK,Led::GREEN);
+    gps.enable();
+    i=0;
+    while( !gps.status() && !user_button.chkButton_press() ) {
+        printf("\rGetting Initial GPS Location Fix. (%d)",++i);
+        fflush(stdout);
+        sleep(1);
+        }
+    printf("\n");
+    gpsstatus *loc = gps.getLocation();
+    printf("Latitude = %f\n", loc->last_pos.lat);
+    printf("Longitude= %f\n\n", loc->last_pos.lng);
 
     i=0;
+    wan_led.enable();
     while( timestamp == -1 ) {
         timestamp=ntp.get_timestamp();
         printf("\rWait for Cellular Connection (%d)",i++);
@@ -238,12 +245,13 @@ int main(int argc, char *argv[])
     stime(&timestamp);
     printf("\rntp.org used to set the time: %s     \n",ctime(&timestamp));
 
+    status_led.set_interval(500);
     status_led.action(Led::LED_ON,Led::GREEN);
     if(verbose) printf("Now, establish connection with Azure IoT Hub.\n\n");
     IoTHub_client_ll_handle =setup_azure();
     if( IoTHub_client_ll_handle == NULL ) {
         printf("ERROR:couldn't connect to Azure!\n");
-        exit(EXIT_SUCCESS);
+        exit(EXIT_FAILURE);
         }
 
     status_led.action(Led::LED_ON,Led::GREEN);
@@ -269,10 +277,20 @@ int main(int argc, char *argv[])
             }
         }
 
-    status_led.action(Led::LED_ON,Led::BLACK);
+    status_led.set_interval(125);
+    status_led.action(Led::LED_BLINK,Led::RED);
+
+    gps.terminate();
+    user_button.terminate();
+    mems.terminate();
+
+    if(verbose) printf("\nClosing connection to Azure IoT Hub...\n\n");
+    IoTHubClient_LL_Destroy(IoTHub_client_ll_handle);
+
+    status_led.terminate();
+    wan_led.terminate();
 
     printf(" - - - - - - - ALL DONE - - - - - - - \n");
     exit(EXIT_SUCCESS);
 }
-
 

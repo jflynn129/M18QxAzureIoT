@@ -6,7 +6,9 @@
 #ifndef __GPS_HPP__
 #define __GPS_HPP__
 
+#include <pthread.h>
 #include <time.h>
+#include <math.h>
 #include <sys/time.h>
 #include <chrono>
 
@@ -16,118 +18,74 @@
 
 typedef struct latlong_t {
     float lat, lng;
-    int   error;
     } latlong;
      
+typedef struct gpsstatus_t {
+    latlong last_pos;
+    time_t  last_try;
+    time_t  last_good;
+    } gpsstatus;
+    
 class Wncgps {
     private:
+        gpsstatus       gps_stat;
         pthread_t       gps_thread;
-        int             gps_to;
+        bool            gps_good;
+        bool            enable_acq;
+        bool            gps_on;
         latlong         loc;
-        bool            quiet;
+        pthread_mutex_t gps_mutex;
         Mal*            malptr;
 
-        static void *gps_task(void *thread) {
-            Wncgps *self = static_cast<Wncgps *>(thread);
-            struct timeval gps_start, gps_end;  
-            json_keyval om[12];
-            double elapse=0;
-            int k, done, i, m=0;
-            m=done=0;
-
-            if( !self->quiet) printf("\nGetting GPS Fix...");
-
-            gettimeofday(&gps_start, NULL);
-            while( !done ) {
-                k=self->getGPSlocation(om,sizeof(om));
-                done = atoi(om[3].value)?1:0;
-                for( i=1; i<k; i++ ) {
-                    if( !strcmp(om[i].key,"latitude") ) 
-                        sscanf( om[i].value, "%f", &self->loc.lat);
-                    else if( !strcmp(om[i].key,"longitude") ) 
-                        sscanf( om[i].value, "%f", &self->loc.lng);
-                    else if( !strcmp(om[i].key,"errno") ) 
-                        sscanf( om[i].value, "%d", &self->loc.error);
-                    }
-                gettimeofday(&gps_end, NULL);
-                elapse = (((gps_end.tv_sec - gps_start.tv_sec)*1000) + (gps_end.tv_usec/1000 - gps_start.tv_usec/1000));
-                if( ((self->gps_to*1000)-round(elapse))/1000 < 0) {
-                    self->loc.error = done = -1;
-                    if( !self->quiet) printf("\rGPS Acquisiton timed out after %d seconds\n",(int)round(elapse)/1000);
-                    }
-                else {
-                    if( !self->quiet) {
-                        printf("\rGetting GPS Fix... %c",(m==0)?'O':(m==1)?'o':(m==2)?'.':' ');
-                        fflush(stdout);
-                        m++;
-                        m %= 4;
-                        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                        }
-                    }
-                }
-            if( !self->quiet) printf("\r");
-
-            pthread_exit(&done);
-            }
-
-        int getGPSlocation(json_keyval *kv, int kvsize) {
-            char rstr[300];
-            char jcmd[] = "{ \"action\" : \"get_loc_position_info\" }";
-            char enable_jcmd[] = "{ \"action\": \"set_loc_config\", \"args\": { \"loc\": true } }";
-            char mode_jcmd[]   = "{ \"action\": \"set_loc_mode\", \"args\": { \"mode\": 4 } }";
-
-            memset(rstr,0x00,sizeof(rstr));
-            malptr->send_mal_command(mode_jcmd, NULL, 0, false);
-            malptr->send_mal_command(enable_jcmd, NULL, 0, false);  //enable GPS
-            if( !malptr->send_mal_command(jcmd, rstr, sizeof(rstr), true) ) 
-                return malptr->parse_maljson (rstr, kv, kvsize);
-
-            return 0;
-            }
+        static void *gps_task(void *thread);
+        int getGPSlocation(json_keyval *kv, int kvsize);
 
     public:
         Wncgps() : 
-            gps_to(120),  //default time-out is 120 seconds
-            quiet(true) 
+            gps_good(false),
+            enable_acq(false),
+            gps_on(true),
+            gps_mutex(PTHREAD_MUTEX_INITIALIZER)
             {
-            char rstr[300];
-            char enable_jcmd[] = "{ \"action\": \"set_loc_config\", \"args\": { \"loc\": true } }";
-            char mode_jcmd[]   = "{ \"action\": \"set_loc_mode\", \"args\": { \"mode\": 3 } }";
             loc.lat = loc.lng = 0.0;
-            loc.error = 0;
+            gps_stat.last_pos = loc;
+            gps_stat.last_try = 0;
+            gps_stat.last_good= 0;
+
             malptr = Mal::get_mal();
             while( !malptr->mal_running() )
                 sleep(1);
-            malptr->send_mal_command(mode_jcmd, rstr, sizeof(rstr), false);
-            malptr->send_mal_command(enable_jcmd, rstr, sizeof(rstr), true);  //enable GPS
+            pthread_create(&gps_thread, NULL, gps_task, (void*)this);
             }
 
-        ~Wncgps () {
-            char rstr[300];
-            char disable_jcmd[] = "{ \"action\": \"set_loc_config\", \"args\": { \"loc\": false } }";
-            malptr->send_mal_command(disable_jcmd, rstr, sizeof(rstr), false); //disable GPS
+        ~Wncgps () { }
+
+        void terminate(void) { 
+            int rval;
+            gps_on=false;
+            pthread_join(gps_thread, (void**)&rval);
             }
 
-        int setTO(int t) {
-            int i = gps_to;
-            gps_to = t;
-            return i;
+        gpsstatus* getLocation(void) {
+            while( pthread_mutex_trylock(&gps_mutex) )
+               pthread_yield();
+            gpsstatus* ptr=&gps_stat;
+            pthread_mutex_unlock(&gps_mutex);
+            return ptr;
             }
 
-        latlong getLocation(bool q) {
-            quiet = q;
-            pthread_create( &gps_thread, NULL, gps_task, (void*)this);
-            pthread_join(gps_thread, NULL);
-            if( loc.error == -1 )
-                reset();
-            return loc;
-            }
+        bool enable(void) { bool t = enable_acq; enable_acq=true; return t; };
+
+        bool disable(void){ bool t = enable_acq; enable_acq=false; return t; };
+
+        bool status(void) { return gps_good; }
 
         int reset(void) {
             char rstr[300];
             char jcmd[] = "{ \"action\": \"set_loc_relocate\" }";
             return malptr->send_mal_command(jcmd, rstr, sizeof(rstr), false);
             }
+
 };
 
 

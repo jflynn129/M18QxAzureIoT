@@ -29,9 +29,11 @@ void *Lis2dw12::lis2dw12_int1_thread(void* obj)
     Lis2dw12      *data = static_cast<Lis2dw12 *>(obj);
     uint8_t        pos=0, stat=0;
 
-    pthread_mutex_lock(&data->mutex);
-    while( true ) {
-        pthread_cond_wait(&data->wait, &data->mutex);
+    pthread_mutex_lock(&data->lis2dw12_mutex);
+    while( data->lis2dw12_active ) {
+        pthread_cond_wait(&data->lis2dw12_wait, &data->lis2dw12_mutex);
+        if( !data->lis2dw12_active )
+            continue;
         stat = data->lis2dw12_read_byte(0x37);
         if( stat & 0x04 ) {
             pos=data->lis2dw12_read_byte(0x3a) & 0b01111111; 
@@ -45,6 +47,7 @@ void *Lis2dw12::lis2dw12_int1_thread(void* obj)
                     data->last_position = ((pos&0x3) == 1)? FACE_AWAY:FACE_FORWARD;
                 }
             }
-        } // will never return...
+        } 
+     pthread_exit(0);
 }
 

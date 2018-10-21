@@ -23,7 +23,8 @@
 #include "azIoTClient.h"
 
 //The following connection string must be updated for the individual users Azure IoT Device
-static const char* connectionString = "HostName=XXXX;DeviceId=xxxx;SharedAccessKey=xxxx";
+//static const char* connectionString = "HostName=XXXX;DeviceId=xxxx;SharedAccessKey=xxxx";
+static const char* connectionString = "HostName=AvnetBG96-Example.azure-devices.net;DeviceId=STL496ZG-BG96;SharedAccessKey=jin/7TC6cqjRlKgvyj9uR9G8pkrrW6BAjS6m9zG/Al8=";
 
 extern void sendMessage(IOTHUB_CLIENT_LL_HANDLE iotHubClientHandle, char* buffer, size_t size);
 extern void prty_json(char* src, int srclen);
@@ -131,18 +132,24 @@ char* send_devrpt(void)
 //------------------------------------------------------------------
 #define LOC_REPORT "{"                  \
   "\"ObjectName\":\"location-report\"," \
+  "\"last GPS fix\":\"%s\","            \
   "\"lat\":%.02f,"                      \
   "\"long\":%.02f"                      \
   "}"
 
 char* send_locrpt(void)
 {
-    latlong loc;
-    int     len = sizeof(LOC_REPORT)+10;
-    char*   ptr = (char*)malloc(len);
+    gpsstatus *loc;
+    char      temp[25];
+    struct tm *ptm;
+    int       len = sizeof(LOC_REPORT)+35;
+    char*     ptr = (char*)malloc(len);
 
-    loc = gps.getLocation(true);
-    snprintf(ptr,len, LOC_REPORT, loc.lat, loc.lng);
+    loc = gps.getLocation();
+    ptm = gmtime(&loc->last_good);
+    strftime(temp,25,"%a %F %X",ptm);
+
+    snprintf(ptr,len, LOC_REPORT, temp, loc->last_pos.lat, loc->last_pos.lng);
     return ptr;
 }
 
@@ -248,8 +255,7 @@ IOTHUBMESSAGE_DISPOSITION_RESULT receiveMessageCallback(
     else
         printf("Received message: '%s'\r\n", temp);
 
-    if( pmsg ) {
-
+    if( pmsg != NULL ) {
         printf("(----)Azure IoT Hub requested response sent - ");
         sendMessage(IoTHub_client_ll_handle, pmsg, strlen(pmsg));
         if( verbose )
