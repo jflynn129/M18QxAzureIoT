@@ -9,8 +9,10 @@ void *Button::button_handler_thread(void *obj)
     struct timespec keypress_duration;
 
     pthread_mutex_lock(&data->button_mutex);
-    while( true ) {
+    while( data->button_active ) {
         pthread_cond_wait(&data->button_wait, &data->button_mutex);
+        if( !data->button_active )
+            continue;
         pin_state = data->pin_state;
         if (!pin_state) {
             data->button_press = true;
@@ -30,5 +32,6 @@ void *Button::button_handler_thread(void *obj)
                 data->br_cb(keypress_duration.tv_sec);
             }
         } //never return
+    pthread_exit(0);
 }
 

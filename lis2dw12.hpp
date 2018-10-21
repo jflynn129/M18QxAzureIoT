@@ -23,7 +23,8 @@ class Lis2dw12 {
             int2_pin_state(GPIO_LEVEL_LOW), 
             temp_updated(false),
             last_position(FACE_UP), 
-            moved(false)
+            moved(false),
+            lis2dw12_active(true)
             {
             gpio_init(int1_gpio, &int1_pin);
             gpio_init(int2_gpio, &int2_pin);
@@ -31,8 +32,8 @@ class Lis2dw12 {
             gpio_dir(int2_pin, GPIO_DIR_OUTPUT);  //generates interrupt to lis2dw12
             gpio_write( int2_pin,  GPIO_LEVEL_LOW );
     
-            pthread_mutex_init(&mutex, NULL);
-            pthread_cond_init(&wait, NULL);
+            pthread_mutex_init(&lis2dw12_mutex, NULL);
+            pthread_cond_init(&lis2dw12_wait, NULL);
             pthread_create(&lis2dw12_irq_thread, NULL, lis2dw12_int1_thread, (void*)this);
 
             foa_insert((void*)this, (int (*)(_gpio_pin_e, _gpio_irq_trig_e))&Lis2dw12::int1_irq_callback);
@@ -46,7 +47,13 @@ class Lis2dw12 {
             lis2dw12_write_byte(0x3f, 0x20); // CTRL7: enable interrupts
             }
 
-        ~Lis2dw12() {
+        ~Lis2dw12() { }
+
+        void terminate(void) { 
+            int rval=0;
+            lis2dw12_active=false;
+            pthread_cond_signal(&lis2dw12_wait);
+            pthread_join(lis2dw12_irq_thread, (void**)&rval);
             gpio_deinit( &int1_pin);
             gpio_deinit( &int2_pin);
             }
@@ -69,7 +76,7 @@ class Lis2dw12 {
     protected:
         int int1_irq_callback(gpio_pin_t pin_state, gpio_irq_trig_t direction) {
             Lis2dw12* obj = (Lis2dw12*)foa_find((int (*)(_gpio_pin_e, _gpio_irq_trig_e))&Lis2dw12::int1_irq_callback);
-            pthread_cond_signal(&obj->wait);
+            pthread_cond_signal(&obj->lis2dw12_wait);
             return 0;
             }
     
@@ -82,8 +89,9 @@ class Lis2dw12 {
         volatile bool          temp_updated;
         position               last_position;
         bool                   moved;
-        pthread_cond_t         wait;
-        pthread_mutex_t        mutex;                                                          
+        bool                   lis2dw12_active;
+        pthread_cond_t         lis2dw12_wait;
+        pthread_mutex_t        lis2dw12_mutex;                                                          
         pthread_t              lis2dw12_irq_thread;
         static void            *lis2dw12_int1_thread(void* obj);
 

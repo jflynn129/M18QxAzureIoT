@@ -59,7 +59,6 @@ int Mal::send_mal_command(char *json_cmd, char *json_resp, int len_json_resp, ui
         pthread_mutex_unlock(&mal_mutex);
         return -2;
         }
-
     if (write(client_socket, json_cmd, strlen(json_cmd)) < 0) {
         close(client_socket);
         pthread_mutex_unlock(&mal_mutex);

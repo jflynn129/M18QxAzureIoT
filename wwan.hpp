@@ -29,6 +29,7 @@ class Wwan {
         pthread_t   wwan_thread;
         int         wwan_active;
         bool        wwan_on;
+        bool        wwan_enable;
 
         char* get_ipAddr(json_keyval *kv, int kvsize) {
             int  i;
@@ -84,6 +85,10 @@ class Wwan {
             bool  wwan_on=false;
 
             while( self->wwan_active ) {
+                if( !self->wwan_enable ) {
+                    sleep(2);
+                    continue;
+                    }
                 ptr=self->get_ipAddr(om, sizeof(om));
                 if( strcmp(ptr,"0.0.0.0") )               //on-line with IP - no blink
                     self->wwan_io(1);
@@ -101,23 +106,38 @@ class Wwan {
                             self->wwan_io(0);                   //nothing - off
                         }
                     }
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                sleep(2);
                 }
             pthread_exit(0);
             }
 
     public:
-        Wwan(void) : wwan_active(true) {
+        Wwan(void) : wwan_active(true), wwan_enable(false) {
             malptr = Mal::get_mal();
             while( !malptr->mal_running() )
                 sleep(1);
             pthread_create( &wwan_thread, NULL, wwan_task, (void*)this);
             }
 
-        ~Wwan() {
+        ~Wwan() { }
+
+        bool enable(void) {
+            bool ok = wwan_enable;
+            wwan_enable = true;
+            return ok;
+            }
+
+        bool disable(void) {
+            bool ok = wwan_enable;
+            wwan_enable = false;
+            return ok;
+            }
+
+        void terminate(void) {
             int rval = 0;
             wwan_active=false;
             pthread_join(wwan_thread, (void**)&rval);
+            wwan_io(0);
             }
 
 };

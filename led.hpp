@@ -20,7 +20,7 @@ extern "C" {
 class Led {
     public:
         enum Color  { BLACK=0, BLUE, GREEN, CYAN, RED, MAGENTA, YELLOW, WHITE, CURRENT };
-        enum Action { LED_OFF=0, LED_ON, LED_BLINK, NONE, LOCK, UNLOCK, LED_EXIT=0x80 };
+        enum Action { LED_OFF=0, LED_ON, LED_BLINK, NONE, LOCK, UNLOCK };
 
         Led(gpio_pin_t r, gpio_pin_t b, gpio_pin_t g) : red_pin(r),
                                                         blue_pin(b),
@@ -32,7 +32,8 @@ class Led {
                                                         blink_interval(500),
                                                         led_action(NONE),
                                                         led_color(BLACK),
-                                                        led_on(false)
+                                                        led_on(false),
+                                                        led_active(true)
             {
             gpio_init( red_pin,  &red_led );
             gpio_init( green_pin, &green_led );
@@ -45,10 +46,13 @@ class Led {
             pthread_create( &led_thread, NULL, led_task, (void*)this);
             }
 
-        ~Led() {
-            int tvalue;
+        ~Led() { }
 
+        void terminate(void) {
+            int tvalue;
+            led_active = false; 
             pthread_join(led_thread, (void**)&tvalue);
+            set_color_on(BLACK);
             gpio_deinit( &red_led);
             gpio_deinit( &green_led);
             gpio_deinit( &blue_led);
@@ -103,12 +107,13 @@ class Led {
         gpio_pin_t      red_pin,blue_pin,green_pin;
 
     protected:
-        pthread_mutex_t led_mutex = PTHREAD_MUTEX_INITIALIZER;
+        pthread_mutex_t led_mutex;
         gpio_handle_t   red_led,blue_led,green_led;
         int             blink_interval; //msec
         Action          led_action;
         Color           led_color;
         bool            led_on;
+        bool            led_active;
 
         void set_color_off(void) {
             gpio_write( red_led,   GPIO_LEVEL_LOW );
@@ -126,7 +131,7 @@ class Led {
             Led *self = static_cast<Led *>(thread);
             int ret_val = 0;
 
-            while ( !(self->led_action & LED_EXIT) ) {
+            while ( self->led_active ) {
                 while( pthread_mutex_trylock(&self->led_mutex) )
                     pthread_yield();
                 if( self->led_action == NONE || self->led_action == LOCK || self->led_action == UNLOCK)

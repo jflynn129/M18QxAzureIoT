@@ -22,6 +22,7 @@ extern "C" {
 }
 #endif // __HWLIB__
 
+#include <stdio.h>
 #include <pthread.h>
 #include <signal.h>
 #include "foa.h"
@@ -38,6 +39,7 @@ class Button {
         bool            button_press;
         bool            pin_state;
         gpio_pin_t      gpio_pin;         //caller specified gpio pin to use
+        bool            button_active;
         pthread_cond_t  button_wait;
         pthread_mutex_t button_mutex;                                                          
         pthread_t       button_thread;
@@ -56,6 +58,7 @@ class Button {
             br_cb=cb;
             bp_cb=NULL;
             button_press=false;
+            button_active=true;
             gpio_pin=the_gpio;
             gpio_init( gpio_pin,  &user_key );  //SW3
             gpio_dir(user_key, GPIO_DIR_INPUT);
@@ -68,7 +71,13 @@ class Button {
             gpio_irq_request(user_key, GPIO_IRQ_TRIG_BOTH, (int (*)(_gpio_pin_e, _gpio_irq_trig_e))&Button::irq_callback);
             }
 
-        ~Button() {
+        ~Button() { }
+
+        void terminate(void) { 
+            int rval = 0;
+            button_active = false; 
+            pthread_cond_signal(&button_wait);
+            pthread_join(button_thread, (void**)&rval);
             gpio_deinit( &user_key);
             }
 
