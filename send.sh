@@ -10,5 +10,5 @@
 # LED-BLINK-MAGENTA  
 # LED-OFF 
 
-az iot device c2d-message send --login "HostName=AvnetBG96-Example.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=hH+1sO3xh8J0P9NuTtNXQOZ901MN9amgFbVb8t+nwoY=" --device-id STL496ZG-BG96 --data "$*"
+az iot device c2d-message send --login "HostName=XXX;SharedAccessKeyName=XXX;SharedAccessKey=XXX" --device-id XXX --data "$*"
 
