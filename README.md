@@ -3,48 +3,67 @@ Azure IoT Client example program uses the Avnet M18Qx System On a Module (SOM)--
 
 The example is capable of running in a standalone configuration (only power required) but to load and interact with the board an ADB (Android Debug Bridge) session must be used.  If using an ADB session, the following is the startup screen that is displayed. 
 
+```
+>> output messages as sent      
 
 
-         ****                       
-        **  **     Azure IoTClient Example, version 1.0
-       **    **    by AVNET
-      ** ==== **
-    
-    This program uses the AT&T IoT Starter Kit, M18QWG (Global)/M18Q2FG-1 (North America) SoC 
-    and interacts with Azure IoTHub sending sensor data and receiving messeages.
-    
-    Click-Barometer PRESENT!
-    Click-Temp&Hum  PRESENT!
-    
-    ntp.org used to set the time: Wed Oct 17 19:30:37 2018
+     ****
+    **  **     Azure IoTClient Example, version 1.0
+   **    **    by AVNET
+  ** ==== **
+
+This program uses the AT&T IoT Starter Kit, M18QWG (Global)/M18Q2FG-1 (North America) SoC 
+and interacts with Azure IoTHub sending sensor data and receiving messeages.
+
+ICCID= 89xxxxxxxxxxxxxxxxxx
+IMEI = 3xxxxxxxxxxxxxx
+
+Click-Barometer PRESENT!
+Click-Temp&Hum  PRESENT!
+
+Getting Initial GPS Location Fix. (1)
+Latitude = 3x.xxxxxx
+Longitude= -7x.xxxxxx
+
+ntp.org used to set the time: Mon Oct 22 12:17:55 2018
+     
+Now, establish connection with Azure IoT Hub.
+
+(0001)Send IoTHubClient Message@12:17:55 - OK
+```
 
 When started, the example program (*referred to as azIoTClient*) performs the following operations:
 
  - The Modem Abstraction Layer to the M18Qx is started 
+ - Command Line arguments are prorcessed
  - Device Information (i.e., ICCID and IMEI) is collected 
  - Any Supported Click Modules that are connected are discovered 
+ - An initial GPS Fix is obtained (this may take several seconds)
  - A cellular connection is established and time obtained from *ntp.org*
 
 After these tasks, azIoTClient begins iteratively sending sensor telemetry to the Azure IoT Hub. This behavior continues until you depress the USR button for >3 seconds at which time azIoTClient terminates.  The messages that are sent are similar to:
+```
+{
+  "ObjectName":"Avnet M18x LTE SOM Azure IoT Client",
+  "ObjectType":"SensorData",
+  "Version":"1.0",
+  "ReportingDevice":"M18QWG/M18Q2FG-1",
+  "DeviceICCID":"xxxxxxxxxxxxxxxxxxxxx",
+  "DeviceIMEI":"xxxxxxxxxxxxxxx",
+  "ADC_value":0.04,
+  "last GPS fix":"Mon 2018-10-22 12:17:54",
+  "lat":xx.xx,
+  "long":xx.xx,
+  "Temperature":82.29,
+  "Board Moved":0,
+  "Board Position":10,
+  "Report Period":10,
+  "TOD":"Mon 2018-10-22 12:17:55 UTC",
+  "Barometer":1020.20,
+  "Humidity":62.4
+}
+```
 
-    {
-      "ObjectName":"Avnet M18x LTE SOM Azure IoT Client",
-      "ObjectType":"SensorData",
-      "Version":"1.0",
-      "ReportingDevice":"M18QWG/M18Q2FG-1",
-      "DeviceICCID":"89011703278100836678",
-      "DeviceIMEI":"353087080010952",
-      "ADC_value":0.08,
-      "lat":36.04,
-      "long":-78.63,
-      "Temperature":93.20,
-      "Board Moved":1,
-      "Board Position":10,
-      "Report Period":10,
-      "TOD":"Wed 2018-10-17 20:06:00 UTC",
-      "Barometer":1011.98,
-      "Humidity":61.5
-    }
 
 
 You can also  send messages from Azure IoT Hub to azIoTClient to elicit various messages or set  operational parameters. Currently, the messages you can send  are:
@@ -62,7 +81,7 @@ You can also  send messages from Azure IoT Hub to azIoTClient to elicit various 
 |LED-BLINK-MAGENTA  |turns the boards LED to Magenta, blinking|
 |LED-OFF |turns off the boards LED|
 
-The remainder of the README.md discusses building and running azIoTClient and assumes you are using  a PC that has Ubuntu Linux installed and running (*other operating systems, e.g., Windows, are not covered here*).
+To moniotor and send messages, you can use the mon.sh and send.sh scripst that are included.  You must provide your azure account information and device name within the scripts and you must have the Azure CLI installed (see https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) and also iothub extensions (see https://docs.microsoft.com/en-us/cli/azure/iot/hub?view=azure-cli-latest). The remainder of the README.md discusses building and running azIoTClient and assumes you are using  a PC that has Ubuntu Linux installed and running (*other operating systems, e.g., Windows, are not covered here*).
 
 ## Prepare the development environment
 Prepare the development environment by installing ADB and the compiler/tools.  Except for ADB, all necessary tools are available from  **http://github.com/Avnet/AvnetWNCSDK**
@@ -89,7 +108,7 @@ Prepare the development environment by installing ADB and the compiler/tools.  E
 ## Install the azIoTClient  source code
 1. Move to the directory that is the root of your development work.
 
-2. Clone the M18qxAzureIoT code by executing: **'git clone --recurse-submodules https://github.com/jflynn129/M18QxAzureIoT'**
+2. Clone the M18qxAzureIoT code: **'git clone --recurse-submodules https://github.com/jflynn129/M18QxAzureIoT'**
 
 3. Go to the  newly cloned directory (**M18QxAzureIoT**)
 
@@ -118,26 +137,32 @@ When starting azIoTClient, there are several flags you can utilize:
 
 |Flag|Description  |
 |--|--|
-|-g *X*  |Set a timeout (in seconds) to wait for a valid GPS fix to be obtained. If a valid fix is not obtained within this timeout, it simply returns a lat/long of 0/0  |
 |-r *X* | Set the reporting time as *x* seconds. azIoTClient will send a standard telemetry message to Azure ~every *x* seconds -- ~ because this is the minimum time to wait
 |-v | Display message contents as they are sent along with other informational data.
 |-? | Display the flags and their explaination |
 
 While running, The LED's on the M18Qx indicate various things:
 * The WWAN Led:
-	* Is off when no signal is detected by the modem
-	* Flashes slowly when a signal is detected by we are not connected
-	* Flashes quickly when connected but no IP address has been obtained
-	* Is on continuously when connected and an IP address is assigned/obtained
+  * Is off when no signal is detected by the modem
+  * Flashes slowly when a signal is detected by we are not connected
+  * Flashes quickly when connected but no IP address has been obtained
+  * Is on continuously when connected and an IP address is assigned/obtained
 
 * The LED is:
-	- Color RED when initially powering up while the hardware is being initialized, it will then begin blinking when obtaining the M18Qx device information such as ICCID, IMEI, Time, and Click Module information.
-	- Color is GREEN when in the while waiting to send information to Azure
-	- Color is BLUE when sending/receiving message with Azure
-	- Color is WHITE when  pressing the USR key
-	- Color is MAGENTA if Azure has instructed the M18Qx to illuminate the LED
+  * Color RED while initially powering up. While the hardware is being initialized:
+  
+    * it will blink slowly when obtaining the M18Qx device information such as ICCID, IMEI, Time, and Click Module information.
+    
+    * it will then blinking quickly GREEN when obtaining the initial GPS Fix (you can press the USR button to bypass the initial GPS fix)
+    
+    * it blinks GREEN slowly when establishing a connection to Azure
+    
+  * Color is solid GREEN while waiting to send information to Azure
+  * Color is BLUE when sending/receiving message with Azure
+  * Color is WHITE when  pressing the USR key
+  * Color is MAGENTA if Azure has instructed the M18Qx to illuminate the LED
 
-**Push button Operation:**
+**USR Push button Operation:**
 * if Pressed for >3 seconds, the M18Qx will exit azIoTClient
 
 **Device Positional information**.  The M18Qx has an ST LIS2DW12 sensor on it and it uses this to report positional information about the orientation of the SOM (*The Face is the top of the SOM that  contains the WNC module*).  It can be:
@@ -169,7 +194,8 @@ While running, The LED's on the M18Qx indicate various things:
 **The LOCATION  report contains**:
 ```
 {
-  "ObjectName":"location-report",      
+  "ObjectName":"location-report",
+  "\"last GPS fix\":\"%s\","            \
   "lat":%.02f,              
   "long":%.02f,             
 }
