@@ -1,3 +1,18 @@
+/**
+* copyright (c) 2018, James Flynn
+* SPDX-License-Identifier: MIT
+*/
+
+/**
+*   @file   lis2dw12.cpp
+*   @brief  member functions for the lis2dw12 class.  The lis2dw12_int1_thread runs continuously and services the lis2dw12 whenever 
+*           an interrupt is generated due to a position change.  
+*
+*   @author James Flynn
+*
+*   @date   1-Oct-2018
+*/
+
 
 #include "lis2dw12.hpp"
 

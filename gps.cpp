@@ -1,3 +1,17 @@
+/**
+* copyright (c) 2018, James Flynn
+* SPDX-License-Identifier: MIT
+*/
+
+/**
+*   @file   gps.cpp
+*   @brief  the gps_task runs continuously reading the GPS data that is being reported so that when asked, the latest LAT/LONG
+*           data is available (the day/time this gps data was retrieved is also captured so you can determine how old it is).
+*
+*   @author James Flynn
+*
+*   @date   1-Oct-2018
+*/
 
 #include "gps.hpp"
 

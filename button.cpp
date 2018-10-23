@@ -1,3 +1,17 @@
+/**
+* copyright (c) 2018, James Flynn
+* SPDX-License-Identifier: MIT
+*/
+
+/**
+*   @file   button.cpp
+*   @brief  the member functions assoicated with the button class. the button_handler_thread runs continuously handling 
+*           button press/release events as indicated by a button interrupt.
+*
+*   @author James Flynn
+*
+*   @date   1-Oct-2018
+*/
 
 #include "button.hpp"
 
