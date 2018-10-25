@@ -24,7 +24,6 @@
 
 //The following connection string must be updated for the individual users Azure IoT Device
 //static const char* connectionString = "HostName=XXXX;DeviceId=xxxx;SharedAccessKey=xxxx";
-static const char* connectionString = "HostName=AvnetBG96-Example.azure-devices.net;DeviceId=STL496ZG-BG96;SharedAccessKey=jin/7TC6cqjRlKgvyj9uR9G8pkrrW6BAjS6m9zG/Al8=";
 
 extern void sendMessage(IOTHUB_CLIENT_LL_HANDLE iotHubClientHandle, char* buffer, size_t size);
 extern void prty_json(char* src, int srclen);
