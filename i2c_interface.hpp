@@ -17,6 +17,7 @@
 
 #include <stdexcept>
 #include <unistd.h>
+#include <pthread.h>
 
 #ifndef __HWLIB__
 extern "C" {
@@ -26,8 +27,9 @@ extern "C" {
 
 class i2c_interface {
     private:
-        static i2c_interface* i2c_iface;
-        static i2c_handle_t   i2c_handle;
+        static i2c_interface*  i2c_iface;
+        static i2c_handle_t    i2c_handle;
+        static pthread_mutex_t i2c_mutex;
         i2c_interface() {};   //prevent inadvertant class creation 
 
     public:
