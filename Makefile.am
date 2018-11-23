@@ -1,13 +1,11 @@
 AUTOMAKE_OPTIONS = subdir-objects
 ACLOCAL_AMFLAGS = -I m4
 
-AM_CPPFLAGS = -I ./msft_azure_iot_sdk/iothub_http_transport/ \
-           -I ./msft_azure_iot_sdk/c-utility/inc/ \
+AM_CPPFLAGS = -I ./msft_azure_iot_sdk/c-utility/inc/ \
+           -I ./msft_azure_iot_sdk/umqtt/inc/ \
+           -I ./msft_azure_iot_sdk/uamqp/inc/ \
            -I ./msft_azure_iot_sdk/iothub_client/inc/ \
            -I ./msft_azure_iot_sdk/iothub_client/inc/internal/ \
-           -I ./msft_azure_iot_sdk/iothub_mqtt_transport/inc/ \
-           -I ./msft_azure_iot_sdk/iothub_ampq_transport/inc/ \
-           -I ./msft_azure_iot_sdk/iothub_ampq_transport/inc/internal \
            -I ./msft_azure_iot_sdk/platform/ \
            -I ./msft_azure_iot_sdk/platform/inc/ \
            -I ./mbedtls/include/ \
@@ -38,23 +36,23 @@ azIoTClient_SOURCES = azIoTClient.cpp foa.cpp mal.cpp jsmn.c i2c_interface.cpp \
 noinst_LIBRARIES = libmsft_azure_iot_sdk.a libarmtls.a 
 
 
-libmsft_azure_iot_sdk_a_SOURCES = ./msft_azure_iot_sdk/iothub_http_transport/iothubtransporthttp.c \
-                                  ./msft_azure_iot_sdk/iothub_http_transport/iothubtransporthttp.h \
-                                  ./msft_azure_iot_sdk/iothub_mqtt_transport/iothub_client_retry_control.c \
-                                  ./msft_azure_iot_sdk/iothub_mqtt_transport/iothubtransportmqtt.c \
-                                  ./msft_azure_iot_sdk/iothub_mqtt_transport/iothubtransport_mqtt_common.c \
-                                  ./msft_azure_iot_sdk/iothub_ampq_transport/iothub_client_retry_control.c \
-                                  ./msft_azure_iot_sdk/iothub_ampq_transport/iothubtransport_amqp_connection.c \
-                                  ./msft_azure_iot_sdk/iothub_ampq_transport/iothubtransportamqp_methods.c \
-                                  ./msft_azure_iot_sdk/iothub_ampq_transport/message_queue.c \
-                                  ./msft_azure_iot_sdk/iothub_ampq_transport/iothubtransportamqp.c \
-                                  ./msft_azure_iot_sdk/iothub_ampq_transport/iothubtransport_amqp_device.c \
-                                  ./msft_azure_iot_sdk/iothub_ampq_transport/iothubtransport_amqp_telemetry_messenger.c \
-                                  ./msft_azure_iot_sdk/iothub_ampq_transport/uamqp_messaging.c \
-                                  ./msft_azure_iot_sdk/iothub_ampq_transport/iothubtransport_amqp_cbs_auth.c \
-                                  ./msft_azure_iot_sdk/iothub_ampq_transport/iothubtransport_amqp_twin_messenger.c \
-                                  ./msft_azure_iot_sdk/iothub_ampq_transport/iothubtransport_amqp_common.c \
-                                  ./msft_azure_iot_sdk/iothub_ampq_transport/iothubtransport_amqp_messenger.c \
+libmsft_azure_iot_sdk_a_SOURCES = ./msft_azure_iot_sdk/iothub_client/src/iothubtransporthttp.c \
+                                  ./msft_azure_iot_sdk/iothub_client/src/iothubtransporthttp.h \
+                                  ./msft_azure_iot_sdk/iothub_client/src/iothub_client_retry_control.c \
+                                  ./msft_azure_iot_sdk/iothub_client/src/iothubtransportmqtt.c \
+                                  ./msft_azure_iot_sdk/iothub_client/src/iothubtransport_mqtt_common.c \
+                                  ./msft_azure_iot_sdk/iothub_client/src/iothub_client_retry_control.c \
+                                  ./msft_azure_iot_sdk/iothub_client/src/iothubtransport_amqp_connection.c \
+                                  ./msft_azure_iot_sdk/iothub_client/src/iothubtransportamqp_methods.c \
+                                  ./msft_azure_iot_sdk/iothub_client/src/message_queue.c \
+                                  ./msft_azure_iot_sdk/iothub_client/src/iothubtransportamqp.c \
+                                  ./msft_azure_iot_sdk/iothub_client/src/iothubtransport_amqp_device.c \
+                                  ./msft_azure_iot_sdk/iothub_client/src/iothubtransport_amqp_telemetry_messenger.c \
+                                  ./msft_azure_iot_sdk/iothub_client/src/uamqp_messaging.c \
+                                  ./msft_azure_iot_sdk/iothub_client/src/iothubtransport_amqp_cbs_auth.c \
+                                  ./msft_azure_iot_sdk/iothub_client/src/iothubtransport_amqp_twin_messenger.c \
+                                  ./msft_azure_iot_sdk/iothub_client/src/iothubtransport_amqp_common.c \
+                                  ./msft_azure_iot_sdk/iothub_client/src/iothubtransport_amqp_messenger.c \
                                   ./msft_azure_iot_sdk/iothub_client/src/blob.c \
                                   ./msft_azure_iot_sdk/iothub_client/src/iothub.c \
                                   ./msft_azure_iot_sdk/iothub_client/src/iothub_client_authorization.c \
