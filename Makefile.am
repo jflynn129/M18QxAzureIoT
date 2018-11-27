@@ -111,6 +111,9 @@ libmsft_azure_iot_sdk_a_SOURCES = ./msft_azure_iot_sdk/iothub_client/src/iothubt
                                   ./msft_azure_iot_sdk/c-utility/src/sha1.c \
                                   ./msft_azure_iot_sdk/c-utility/src/urlencode.c \
                                   ./msft_azure_iot_sdk/c-utility/src/vector.c \
+                                  ./msft_azure_iot_sdk/umqtt/src/mqtt_client.c \
+                                  ./msft_azure_iot_sdk/umqtt/src/mqtt_codec.c \
+                                  ./msft_azure_iot_sdk/umqtt/src/mqtt_message.c \
                                   ./msft_azure_iot_sdk/platform/agenttime.c  \
                                   ./msft_azure_iot_sdk/platform/lock_pthreads.c  \
                                   ./msft_azure_iot_sdk/platform/platform_linux.c  \
@@ -120,6 +123,7 @@ libmsft_azure_iot_sdk_a_SOURCES = ./msft_azure_iot_sdk/iothub_client/src/iothubt
                                   ./msft_azure_iot_sdk/platform/tlsio_mbedtls.c \
                                   ./msft_azure_iot_sdk/platform/httpapi_compact.c \
                                   ./msft_azure_iot_sdk/platform/httpapi_curl.c  
+
 
 bin_PROGRAMS = azIoTClient 
 
