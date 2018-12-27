@@ -44,6 +44,7 @@ extern "C" {
 IOTHUB_CLIENT_LL_HANDLE  setup_azure(void);
 void sendMessage(IOTHUB_CLIENT_LL_HANDLE iotHubClientHandle, char* buffer, size_t size);
 void button_release(int);
+void bb_release(int);             //boot button release
 
 Led::Color   current_color;
 Led::Action  current_action;
@@ -52,6 +53,7 @@ char         iccid[25];
 int          report_period = 10;  //default to 10 second reports
 bool         verbose = false;     //default to quiet mode
 bool         done = false;        //not yet done
+bool         bb_pressed = false;  //track if the boot button is pressed
 unsigned int click_modules = 0;   //no Click Modules present
 
 IOTHUB_CLIENT_LL_HANDLE  IoTHub_client_ll_handle;
@@ -63,6 +65,7 @@ Led       status_led(GPIO_PIN_92, GPIO_PIN_102, GPIO_PIN_101);
 Barometer barom(LPS25HB_SAD);
 Hts221    humid(HTS221_SAD);
 Button    user_button(GPIO_PIN_98, button_release);
+Button    boot_button(GPIO_PIN_1, bb_release);  //handle the boot button
 
 //
 // arguments the program takes during startup.
@@ -78,18 +81,33 @@ void usage (void)
 void button_press(void)
 {
     current_color = status_led.color(Led::CURRENT);
-    current_action= status_led.action(Led::LED_ON,Led::WHITE);
+    status_led.action(Led::LED_ON,Led::WHITE);
     current_action= status_led.action(Led::LOCK);
 }
 
 void button_release( int dur )
 {
+    status_led.action(Led::UNLOCK);
+    status_led.action(current_action, current_color);
     if( dur > 3 ) {
         status_led.set_interval(125);
         done = true;
         }
+}
+
+void bb_release( int dur )
+{
+    bb_pressed = false;
     status_led.action(Led::UNLOCK);
     status_led.action(current_action, current_color);
+}
+
+void bb_press( void )
+{
+    bb_pressed = true;
+    current_color = status_led.color(Led::CURRENT);
+    status_led.action(Led::LED_ON,Led::WHITE);
+    current_action= status_led.action(Led::LOCK);
 }
 
 /* Standard Report sent to Azure repeatedly */
@@ -175,6 +193,7 @@ int main(int argc, char *argv[])
 
     status_led.action(Led::LED_ON,Led::RED);
     user_button.button_press_cb( button_press );
+    boot_button.button_press_cb( bb_press );
 
     while((i=getopt(argc,argv,"vr:?")) != -1 )
         switch(i) {
@@ -282,6 +301,7 @@ int main(int argc, char *argv[])
 
     gps.terminate();
     user_button.terminate();
+    boot_button.terminate();
     mems.terminate();
 
     if(verbose) printf("\nClosing connection to Azure IoT Hub...\n\n");

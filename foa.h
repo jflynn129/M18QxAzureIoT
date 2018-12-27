@@ -29,12 +29,12 @@ extern "C" {
 
 typedef struct obj_struct_t {
     void *obj;
-    int    (*func)(gpio_pin_t pin_state, gpio_irq_trig_t direction);
+    void *key;
     obj_struct_t *nxt;
     } obj_struct;
 
-bool foa_insert( void* obj, int (*func)(gpio_pin_t pin_state, gpio_irq_trig_t direction));
-void* foa_find(int (*func)(gpio_pin_t pin_state, gpio_irq_trig_t direction));
+bool foa_insert( void* obj, void *key);
+void* foa_find(void* key);
 
 #endif //__FOA_H__
 
