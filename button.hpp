@@ -27,6 +27,9 @@ extern "C" {
 #include <signal.h>
 #include "foa.h"
 
+#define BUTTON_ACTIVE_HIGH    0
+#define BUTTON_ACTIVE_LOW     1
+
 #pragma GCC diagnostic ignored "-Wpmf-conversions"
 
 class Button {
@@ -37,6 +40,7 @@ class Button {
         void            (*bp_cb)(void);   //button press callback
         bool            button_press;
         bool            button_active;
+        bool            active_low;
         gpio_handle_t   key;
         gpio_level_t    pin_state;
         pthread_mutex_t button_mutex;                                                          
@@ -46,6 +50,8 @@ class Button {
         static int irq_callback(gpio_pin_t pin, gpio_irq_trig_t direction) {
             Button* obj = (Button*)foa_find((void*)pin);
             gpio_read(obj->key, &(obj->pin_state));
+            if( obj->active_low )
+                obj->pin_state = (obj->pin_state==GPIO_LEVEL_LOW)? GPIO_LEVEL_HIGH:GPIO_LEVEL_LOW;
             pthread_cond_signal(&obj->button_wait);
             return 0;
         }
@@ -53,12 +59,13 @@ class Button {
 
     public:
 
-        Button(gpio_pin_t the_gpio, void (*cb)(int)) {
+        Button(gpio_pin_t the_gpio, bool ba, void (*cb)(int)) {
             key=0;
             br_cb=cb;
             bp_cb=NULL;
             button_press=false;
             button_active=true;
+            active_low=ba;
             gpio_init( the_gpio,  &key );  //SW3
             gpio_dir(key, GPIO_DIR_INPUT);
 
@@ -79,6 +86,7 @@ class Button {
             pthread_join(button_thread, (void**)&rval);
             gpio_deinit( &key);
             }
+
 
         bool chkButton_press(void) {
             return button_press;

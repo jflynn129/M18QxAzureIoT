@@ -64,8 +64,8 @@ Adc       adc;
 Led       status_led(GPIO_PIN_92, GPIO_PIN_102, GPIO_PIN_101);
 Barometer barom(LPS25HB_SAD);
 Hts221    humid(HTS221_SAD);
-Button    user_button(GPIO_PIN_98, button_release);
-Button    boot_button(GPIO_PIN_1, bb_release);  //handle the boot button
+Button    user_button(GPIO_PIN_98, BUTTON_ACTIVE_HIGH, button_release);
+Button    boot_button(GPIO_PIN_1, BUTTON_ACTIVE_LOW, bb_release);  //handle the boot button
 
 //
 // arguments the program takes during startup.
