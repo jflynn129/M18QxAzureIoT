@@ -3,8 +3,16 @@
 * SPDX-License-Identifier: MIT
 */
 
+
+//#define USE_MQTT //define USE_MQTT to use MQTT, otherwise it will use HTTP
+
 #include <stdlib.h>
+
+#ifdef USE_MQTT
+#include "iothubtransportmqtt.h"
+#else
 #include "iothubtransporthttp.h"
+#endif
 #include "iothub_client_core_common.h"
 #include "iothub_client_ll.h"
 #include "azure_c_shared_utility/platform.h"
@@ -24,6 +32,7 @@
 
 //The following connection string must be updated for the individual users Azure IoT Device
 //static const char* connectionString = "HostName=XXXX;DeviceId=xxxx;SharedAccessKey=xxxx";
+static const char* connectionString = "HostName=M18QxIoTClient.azure-devices.net;DeviceId=SK2-IMEI353087080010952;SharedAccessKey=3vyDD6lO1VRCfi1bCZ58QsTUsViEZ3Q4JBErtvQzBcA=";
 
 extern void sendMessage(IOTHUB_CLIENT_LL_HANDLE iotHubClientHandle, char* buffer, size_t size);
 extern void prty_json(char* src, int srclen);
@@ -55,7 +64,11 @@ IOTHUB_CLIENT_LL_HANDLE setup_azure(void)
 {
 
     /* Setup IoTHub client configuration */
+#ifdef IOTHUBTRANSPORTHTTP_H
     IOTHUB_CLIENT_LL_HANDLE iotHubClientHandle = IoTHubClient_LL_CreateFromConnectionString(connectionString, HTTP_Protocol);
+#else
+    IOTHUB_CLIENT_LL_HANDLE iotHubClientHandle = IoTHubClient_LL_CreateFromConnectionString(connectionString, MQTT_Protocol);
+#endif
     if (iotHubClientHandle == NULL) {
         printf("Failed on IoTHubClient_Create\r\n");
         return NULL;
@@ -68,6 +81,7 @@ IOTHUB_CLIENT_LL_HANDLE setup_azure(void)
         return NULL;
         }
 
+#ifdef IOTHUBTRANSPORTHTTP_H
     // polls will happen effectively at ~10 seconds.  The default value of minimumPollingTime is 25 minutes. 
     // For more information, see:
     //     https://azure.microsoft.com/documentation/articles/iot-hub-devguide/#messaging
@@ -78,6 +92,7 @@ IOTHUB_CLIENT_LL_HANDLE setup_azure(void)
         printf("failure to set option \"MinimumPollingTime\"\r\n");
         return NULL;
         }
+#endif
 
     // set C2D and device method callback
     IoTHubClient_LL_SetMessageCallback(iotHubClientHandle, receiveMessageCallback, NULL);

@@ -36,7 +36,7 @@ class Lis2dw12 {
             pthread_cond_init(&lis2dw12_wait, NULL);
             pthread_create(&lis2dw12_irq_thread, NULL, lis2dw12_int1_thread, (void*)this);
 
-            foa_insert((void*)this, (int (*)(_gpio_pin_e, _gpio_irq_trig_e))&Lis2dw12::int1_irq_callback);
+            foa_insert((void*)this, (void*)&Lis2dw12::int1_irq_callback);
             gpio_irq_request(int1_pin, GPIO_IRQ_TRIG_RISING, (int (*)(_gpio_pin_e, _gpio_irq_trig_e))&Lis2dw12::int1_irq_callback);
 
             lis2dw12_write_byte(0x25, 0x00); // CTRL6: Set Full-scale to +/-2g
@@ -75,7 +75,7 @@ class Lis2dw12 {
 
     protected:
         int int1_irq_callback(gpio_pin_t pin_state, gpio_irq_trig_t direction) {
-            Lis2dw12* obj = (Lis2dw12*)foa_find((int (*)(_gpio_pin_e, _gpio_irq_trig_e))&Lis2dw12::int1_irq_callback);
+            Lis2dw12* obj = (Lis2dw12*)foa_find((void*)&Lis2dw12::int1_irq_callback);
             pthread_cond_signal(&obj->lis2dw12_wait);
             return 0;
             }

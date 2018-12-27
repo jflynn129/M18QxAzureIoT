@@ -59,6 +59,35 @@ class Devinfo {
                 }
             return done;
             }
+
+        int setLPM(bool on) {
+            int         done;
+            json_keyval om[12];
+            char        rstr[100];
+            char        setLPM[] = "{ \"action\" : \"set_operating_mode\", \"args\": { \"operating_mode\":1 }}";
+            char        clrLPM[] = "{ \"action\" : \"set_operating_mode\", \"args\": { \"operating_mode\":0 }}";
+            char        getLPM[] = "{ \"action\" : \"get_operating_mode\" }";
+
+            if( on ) {
+                malptr->send_mal_command(setLPM, rstr, sizeof(rstr), true);
+                done = malptr->parse_maljson (rstr, om, sizeof(om));
+                if( done < 0 )  //parse failed
+                    return -1000;
+                done =atoi(om[1].value);
+                return (done==0)? 0:-done;
+                }
+            else{
+                malptr->send_mal_command(clrLPM, rstr, sizeof(rstr), true);
+                sleep(1);
+                while( !done ) {
+                    malptr->send_mal_command(getLPM, rstr, sizeof(rstr), true);
+                    done = malptr->parse_maljson (rstr, om, sizeof(om));
+                    done = ( done>0 && atoi(om[1].value) == 0); 
+                    }
+                return 0;
+                }
+        }
+
 };
 
 

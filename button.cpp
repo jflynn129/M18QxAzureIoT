@@ -15,11 +15,10 @@
 
 #include "button.hpp"
 
-
 void *Button::button_handler_thread(void *obj)
 {
     Button *data = static_cast<Button *>(obj);
-    bool   pin_state;
+    gpio_level_t   pin_state;
     struct timespec keypress_duration;
 
     pthread_mutex_lock(&data->button_mutex);

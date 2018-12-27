@@ -16,6 +16,8 @@
 #include <sys/un.h>
 #include <sys/syscall.h>
 #include <sys/socket.h>
+#include <termios.h>
+#include <stdarg.h>
 
 #include "azIoTClient.h"
 
@@ -29,6 +31,7 @@ extern "C" {
 
 #include "gps.hpp"
 #include "devinfo.hpp"
+#include "spi.hpp"
 #include "led.hpp"
 #include "i2c.hpp"
 #include "lis2dw12.hpp"
@@ -44,6 +47,7 @@ extern "C" {
 IOTHUB_CLIENT_LL_HANDLE  setup_azure(void);
 void sendMessage(IOTHUB_CLIENT_LL_HANDLE iotHubClientHandle, char* buffer, size_t size);
 void button_release(int);
+void bb_release(int);             //boot button release
 
 Led::Color   current_color;
 Led::Action  current_action;
@@ -52,7 +56,22 @@ char         iccid[25];
 int          report_period = 10;  //default to 10 second reports
 bool         verbose = false;     //default to quiet mode
 bool         done = false;        //not yet done
+bool         bb_pressed = false;  //track if the boot button is pressed
+
+bool         use_uart2 = false;   //is true when using UART2
+int          lpm_enabled = 0;     //Low Power Modes defined below...
 unsigned int click_modules = 0;   //no Click Modules present
+
+//Low Power Modes
+#define NO_LPM     0
+#define ENTER_LPM  1
+#define IN_LPM     2
+#define EXIT_LPM   3
+
+
+//if using UART2, the following are needed
+struct termios options;
+int uart2_fd;
 
 IOTHUB_CLIENT_LL_HANDLE  IoTHub_client_ll_handle;
 
@@ -62,7 +81,9 @@ Adc       adc;
 Led       status_led(GPIO_PIN_92, GPIO_PIN_102, GPIO_PIN_101);
 Barometer barom(LPS25HB_SAD);
 Hts221    humid(HTS221_SAD);
-Button    user_button(GPIO_PIN_98, button_release);
+Button    user_button(GPIO_PIN_98, BUTTON_ACTIVE_HIGH, button_release);
+Button    boot_button(GPIO_PIN_1, BUTTON_ACTIVE_LOW, bb_release);  //handle the boot button
+Devinfo   device;
 
 //
 // arguments the program takes during startup.
@@ -70,6 +91,7 @@ Button    user_button(GPIO_PIN_98, button_release);
 void usage (void)
 {
     printf(" The 'azIoTClient' program can be started with several options:\n");
+    printf(" -u  : Enable/Use UART2.\n");
     printf(" -v  : Display Messages as sent.\n");
     printf(" -r X: Set the reporting period in 'X' (seconds)\n");
     printf(" -?  : Display usage info\n");
@@ -78,18 +100,59 @@ void usage (void)
 void button_press(void)
 {
     current_color = status_led.color(Led::CURRENT);
-    current_action= status_led.action(Led::LED_ON,Led::WHITE);
+    status_led.action(Led::LED_ON,Led::WHITE);
     current_action= status_led.action(Led::LOCK);
 }
 
 void button_release( int dur )
 {
+    status_led.action(Led::UNLOCK);
+    status_led.action(current_action, current_color);
     if( dur > 3 ) {
         status_led.set_interval(125);
         done = true;
         }
+    else{
+        switch (lpm_enabled) {
+            case NO_LPM:
+                lpm_enabled = ENTER_LPM;
+                break;
+
+            case IN_LPM:
+                lpm_enabled = EXIT_LPM;
+                break;
+
+            default: 
+                break;
+            }
+        }
+}
+
+void bb_release( int dur )
+{
+    bb_pressed = false;
     status_led.action(Led::UNLOCK);
     status_led.action(current_action, current_color);
+}
+
+void bb_press( void )
+{
+    bb_pressed = true;
+    switch (lpm_enabled) {
+        case NO_LPM:
+            lpm_enabled = ENTER_LPM;
+            break;
+
+        case IN_LPM:
+            lpm_enabled = EXIT_LPM;
+            break;
+
+        default: 
+            break;
+        }
+    current_color = status_led.color(Led::CURRENT);
+    status_led.action(Led::LED_ON,Led::WHITE);
+    current_action= status_led.action(Led::LOCK);
 }
 
 /* Standard Report sent to Azure repeatedly */
@@ -162,12 +225,39 @@ char* make_message(char* iccid, char* imei)
     return ptr;
 }
 
+void verbose_output( const char * format, ... )
+{
+    char buffer[256];
+    va_list args;
+    va_start (args, format);
+    vsprintf (buffer,format, args);
+    va_end (args);
+    if(verbose) 
+        printf("%s",buffer);
+    if(use_uart2) {
+        write(uart2_fd, buffer, strlen(buffer));
+
+        int n = read(uart2_fd, buffer, sizeof(buffer));
+        if( n>0 ){
+            buffer[n] = '\0';
+
+            printf("Read (%i bytes): %s", n, buffer);
+            if( strstr(buffer,"lpm") ) {
+              if( strstr(buffer, "on") )
+                 lpm_enabled = ENTER_LPM;
+              if( strstr(buffer, "off") )
+                 lpm_enabled = EXIT_LPM;
+              }
+            }
+        }
+    fflush(stdout);
+
+}
 
 int main(int argc, char *argv[]) 
 {
     int       i, msg_sent=1;
     char     *ptr;
-    Devinfo   device;
     Wwan      wan_led;
     void      prty_json(char* src, int srclen);
     NTPClient ntp;
@@ -175,9 +265,25 @@ int main(int argc, char *argv[])
 
     status_led.action(Led::LED_ON,Led::RED);
     user_button.button_press_cb( button_press );
+    boot_button.button_press_cb( bb_press );
 
-    while((i=getopt(argc,argv,"vr:?")) != -1 )
+    while((i=getopt(argc,argv,"uvr:?")) != -1 )
         switch(i) {
+           case 'u':
+               use_uart2 = true; 
+               uart2_fd = open("/dev/ttyHSL0", O_RDWR | O_NOCTTY | O_NDELAY);
+               if (uart2_fd == -1) 
+                   printf("Unable to open UART2!");
+               else {
+                   fcntl(uart2_fd, F_SETFL, FNDELAY);
+                   tcgetattr(uart2_fd, &options);
+                   cfsetspeed(&options, B115200);
+                   tcsetattr(uart2_fd, TCSANOW, &options);
+                   int n = write(uart2_fd, "Using UART2!\n",13);
+                   if (n < 0) 
+                     printf("Write to UART2 failed!");
+                   }
+               break;
            case 'v':
                verbose = true;
                printf(">> output messages as sent\n");
@@ -211,7 +317,7 @@ int main(int argc, char *argv[])
     status_led.action(Led::LED_BLINK,Led::RED);
     device.getICCID(iccid,sizeof(iccid));
     device.getIMEI(imei,sizeof(imei));
-    if(verbose) printf("ICCID= %s\nIMEI = %s\n\n",iccid,imei);
+    verbose_output("ICCID= %s\nIMEI = %s\n\n",iccid,imei);
 
     click_modules |= (barom.who_am_i()==LPS25HB_WHO_AM_I)? BAROMETER_CLICK:0;
     click_modules |= (humid.who_am_i()==I_AM_HTS221)? HTS221_CLICK:0;
@@ -247,7 +353,7 @@ int main(int argc, char *argv[])
 
     status_led.set_interval(500);
     status_led.action(Led::LED_ON,Led::GREEN);
-    if(verbose) printf("Now, establish connection with Azure IoT Hub.\n\n");
+    verbose_output("Now, establish connection with Azure IoT Hub.\n\n");
     IoTHub_client_ll_handle =setup_azure();
     if( IoTHub_client_ll_handle == NULL ) {
         printf("ERROR:couldn't connect to Azure!\n");
@@ -256,24 +362,53 @@ int main(int argc, char *argv[])
 
     status_led.action(Led::LED_ON,Led::GREEN);
     while( !done ) {
-        if( status_led.color(Led::CURRENT) != Led::MAGENTA)
-            status_led.action(Led::LED_ON,Led::BLUE);
-        printf("(%04d)",msg_sent++);
-        ptr = make_message(iccid, imei);
-        sendMessage(IoTHub_client_ll_handle, ptr, strlen(ptr));
-        if( verbose )
-            prty_json(ptr,strlen(ptr));
-        free(ptr);
+        switch (lpm_enabled) {
+            case ENTER_LPM:
+                if( device.setLPM(true) == 0)
+                    lpm_enabled = IN_LPM;
+                break;
 
-        if( status_led.color(Led::CURRENT) != Led::MAGENTA)
-            status_led.action(Led::LED_ON,Led::GREEN);
+            case EXIT_LPM:
+                if( device.setLPM(false) == 0 ) 
+                    lpm_enabled = NO_LPM;
+timestamp=-1;
+i=0;
+    while( timestamp == -1 ) {
+        timestamp=ntp.get_timestamp();
+        printf("\rrestart Cellular Connection (%d)",i++);
+        fflush(stdout);
+        sleep(1);
+        }
 
-        i = 0;
-        /* schedule IoTHubClient to send events/receive commands */
-        while(i < report_period && !done) {
-            IoTHubClient_LL_DoWork(IoTHub_client_ll_handle);
-            i += REPORT_PERIOD_RESOLUTION;
-            sleep(REPORT_PERIOD_RESOLUTION);
+                break;
+
+            case IN_LPM:
+                verbose_output("Low Power Mode active, Sleeping (%3d seconds)\r",i++);
+                fflush(stdout);
+                sleep(1);
+                break;
+
+            case NO_LPM:
+                if( status_led.color(Led::CURRENT) != Led::MAGENTA)
+                    status_led.action(Led::LED_ON,Led::BLUE);
+                printf("(%04d)",msg_sent++);
+                ptr = make_message(iccid, imei);
+                sendMessage(IoTHub_client_ll_handle, ptr, strlen(ptr));
+                prty_json(ptr,strlen(ptr));
+                free(ptr);
+        
+                if( status_led.color(Led::CURRENT) != Led::MAGENTA)
+                    status_led.action(Led::LED_ON,Led::GREEN);
+        
+                i = 0;
+                /* schedule IoTHubClient to send events/receive commands */
+                while( i<report_period && !done ) {
+                    IoTHubClient_LL_DoWork(IoTHub_client_ll_handle);
+                    i += REPORT_PERIOD_RESOLUTION;
+                    sleep(REPORT_PERIOD_RESOLUTION);
+                    }
+                break;
+
             }
         }
 
@@ -282,6 +417,7 @@ int main(int argc, char *argv[])
 
     gps.terminate();
     user_button.terminate();
+    boot_button.terminate();
     mems.terminate();
 
     if(verbose) printf("\nClosing connection to Azure IoT Hub...\n\n");
