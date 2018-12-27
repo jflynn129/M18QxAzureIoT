@@ -20,14 +20,14 @@
 
 static obj_struct *head=NULL;
 
-bool foa_insert( void* obj, int (*func)(gpio_pin_t pin_state, gpio_irq_trig_t direction)) 
+bool foa_insert( void* obj, void * key)
 {
     obj_struct* hptr= head;
     obj_struct* ptr = (obj_struct*) malloc(sizeof(obj_struct));
     if( !ptr )
         return false;
     ptr->obj = obj;
-    ptr->func = func;
+    ptr->key = key;
     ptr->nxt = NULL;
     
     if( hptr == NULL )
@@ -40,10 +40,10 @@ bool foa_insert( void* obj, int (*func)(gpio_pin_t pin_state, gpio_irq_trig_t di
     return true;
 }
 
-void* foa_find(int (*func)(gpio_pin_t pin_state, gpio_irq_trig_t direction)) 
+void* foa_find(void* key)
 {
     obj_struct* hptr = head;
-    while( hptr != NULL && hptr->func != func )
+    while( hptr != NULL && hptr->key != key )
         hptr = hptr->nxt;
     if( hptr != NULL )
         return hptr->obj;
