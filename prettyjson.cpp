@@ -16,6 +16,8 @@
 
 #include <stdio.h>
 
+void verbose_output( const char * format, ... );
+
 void prty_json(char* src, int srclen)
 {
     int indent = 0;
@@ -24,31 +26,31 @@ void prty_json(char* src, int srclen)
             case '{':
             case '[':
                 indent += 2;
-                printf("%c\n",src[i]);
+                verbose_output("%c\n",src[i]);
                 for( int k=0; k<indent; k++ )
-                    printf(" ");
+                    verbose_output(" ");
                 break;
                 
             case '}':
             case ']':
-                printf("\n");
+                verbose_output("\n");
                 if( indent >= 2 )
                     indent -= 2;
                 for( int k=0; k<indent; k++ )
-                    printf(" ");
-                printf("%c",src[i]);
+                    verbose_output(" ");
+                verbose_output("%c",src[i]);
                 if( src[i] == '}' )
-                    printf("\n");
+                    verbose_output("\n");
                 break;
                 
             case ',':
-                printf(",\n");
+                verbose_output(",\n");
                 for( int k=0; k<indent; k++ )
-                    printf(" ");
+                    verbose_output(" ");
                 break;
 
             default:
-                printf("%c",src[i]);
+                verbose_output("%c",src[i]);
                 break;
             }
         }
