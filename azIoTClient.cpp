@@ -16,6 +16,8 @@
 #include <sys/un.h>
 #include <sys/syscall.h>
 #include <sys/socket.h>
+#include <termios.h>
+#include <stdarg.h>
 
 #include "azIoTClient.h"
 
@@ -29,6 +31,7 @@ extern "C" {
 
 #include "gps.hpp"
 #include "devinfo.hpp"
+#include "spi.hpp"
 #include "led.hpp"
 #include "i2c.hpp"
 #include "lis2dw12.hpp"
@@ -54,7 +57,12 @@ int          report_period = 10;  //default to 10 second reports
 bool         verbose = false;     //default to quiet mode
 bool         done = false;        //not yet done
 bool         bb_pressed = false;  //track if the boot button is pressed
+bool         use_uart2 = false;
 unsigned int click_modules = 0;   //no Click Modules present
+
+//if using UART2, the following are needed
+struct termios options;
+int uart2_fd;
 
 IOTHUB_CLIENT_LL_HANDLE  IoTHub_client_ll_handle;
 
@@ -73,6 +81,7 @@ Button    boot_button(GPIO_PIN_1, BUTTON_ACTIVE_LOW, bb_release);  //handle the 
 void usage (void)
 {
     printf(" The 'azIoTClient' program can be started with several options:\n");
+    printf(" -u  : Enable/Use UART2.\n");
     printf(" -v  : Display Messages as sent.\n");
     printf(" -r X: Set the reporting period in 'X' (seconds)\n");
     printf(" -?  : Display usage info\n");
@@ -180,6 +189,25 @@ char* make_message(char* iccid, char* imei)
     return ptr;
 }
 
+void verbose_output( const char * format, ... )
+{
+    char buffer[256];
+    va_list args;
+    va_start (args, format);
+    vsprintf (buffer,format, args);
+    va_end (args);
+    if(verbose) 
+        printf("%s",buffer);
+    if(use_uart2) {
+        write(uart2_fd, buffer, strlen(buffer));
+
+        int n = read(uart2_fd, buffer, sizeof(buffer));
+        if( n>0 ){
+            buffer[n] = '\0';
+            printf("%i bytes read : %s", n, buffer);
+            }
+        }
+}
 
 int main(int argc, char *argv[]) 
 {
@@ -195,8 +223,23 @@ int main(int argc, char *argv[])
     user_button.button_press_cb( button_press );
     boot_button.button_press_cb( bb_press );
 
-    while((i=getopt(argc,argv,"vr:?")) != -1 )
+    while((i=getopt(argc,argv,"uvr:?")) != -1 )
         switch(i) {
+           case 'u':
+               use_uart2 = true; 
+               uart2_fd = open("/dev/ttyHSL0", O_RDWR | O_NOCTTY | O_NDELAY);
+               if (uart2_fd == -1) 
+                   printf("Unable to open UART2!");
+               else {
+                   fcntl(uart2_fd, F_SETFL, FNDELAY);
+                   tcgetattr(uart2_fd, &options);
+                   cfsetspeed(&options, B115200);
+                   tcsetattr(uart2_fd, TCSANOW, &options);
+                   int n = write(uart2_fd, "Using UART2!\n",13);
+                   if (n < 0) 
+                     printf("Write to UART2 failed!");
+                   }
+               break;
            case 'v':
                verbose = true;
                printf(">> output messages as sent\n");
@@ -230,7 +273,7 @@ int main(int argc, char *argv[])
     status_led.action(Led::LED_BLINK,Led::RED);
     device.getICCID(iccid,sizeof(iccid));
     device.getIMEI(imei,sizeof(imei));
-    if(verbose) printf("ICCID= %s\nIMEI = %s\n\n",iccid,imei);
+    verbose_output("ICCID= %s\nIMEI = %s\n\n",iccid,imei);
 
     click_modules |= (barom.who_am_i()==LPS25HB_WHO_AM_I)? BAROMETER_CLICK:0;
     click_modules |= (humid.who_am_i()==I_AM_HTS221)? HTS221_CLICK:0;
@@ -266,7 +309,7 @@ int main(int argc, char *argv[])
 
     status_led.set_interval(500);
     status_led.action(Led::LED_ON,Led::GREEN);
-    if(verbose) printf("Now, establish connection with Azure IoT Hub.\n\n");
+    verbose_output("Now, establish connection with Azure IoT Hub.\n\n");
     IoTHub_client_ll_handle =setup_azure();
     if( IoTHub_client_ll_handle == NULL ) {
         printf("ERROR:couldn't connect to Azure!\n");
@@ -280,8 +323,7 @@ int main(int argc, char *argv[])
         printf("(%04d)",msg_sent++);
         ptr = make_message(iccid, imei);
         sendMessage(IoTHub_client_ll_handle, ptr, strlen(ptr));
-        if( verbose )
-            prty_json(ptr,strlen(ptr));
+        prty_json(ptr,strlen(ptr));
         free(ptr);
 
         if( status_led.color(Led::CURRENT) != Led::MAGENTA)
