@@ -74,6 +74,7 @@ Barometer barom(LPS25HB_SAD);
 Hts221    humid(HTS221_SAD);
 Button    user_button(GPIO_PIN_98, BUTTON_ACTIVE_HIGH, button_release);
 Button    boot_button(GPIO_PIN_1, BUTTON_ACTIVE_LOW, bb_release);  //handle the boot button
+Devinfo   device;
 
 //
 // arguments the program takes during startup.
@@ -204,7 +205,13 @@ void verbose_output( const char * format, ... )
         int n = read(uart2_fd, buffer, sizeof(buffer));
         if( n>0 ){
             buffer[n] = '\0';
-            printf("%i bytes read : %s", n, buffer);
+            printf("Read (%i bytes): %s", n, buffer);
+            if( strstr(buffer,"lpm") ) {
+              if( strstr(buffer, "on") )
+                 device.setLPM(true);
+              if( strstr(buffer, "off") )
+                 device.setLPM(false);
+              }
             }
         }
 }
@@ -213,7 +220,6 @@ int main(int argc, char *argv[])
 {
     int       i, msg_sent=1;
     char     *ptr;
-    Devinfo   device;
     Wwan      wan_led;
     void      prty_json(char* src, int srclen);
     NTPClient ntp;
