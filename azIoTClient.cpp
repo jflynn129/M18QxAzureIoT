@@ -58,6 +58,7 @@ bool         verbose = false;     //default to quiet mode
 bool         done = false;        //not yet done
 bool         bb_pressed = false;  //track if the boot button is pressed
 bool         use_uart2 = false;
+bool         lpm_enabled = false;
 unsigned int click_modules = 0;   //no Click Modules present
 
 //if using UART2, the following are needed
@@ -115,6 +116,7 @@ void bb_release( int dur )
 void bb_press( void )
 {
     bb_pressed = true;
+    lpm_enabled = !lpm_enabled;
     current_color = status_led.color(Led::CURRENT);
     status_led.action(Led::LED_ON,Led::WHITE);
     current_action= status_led.action(Led::LOCK);
@@ -208,9 +210,9 @@ void verbose_output( const char * format, ... )
             printf("Read (%i bytes): %s", n, buffer);
             if( strstr(buffer,"lpm") ) {
               if( strstr(buffer, "on") )
-                 device.setLPM(true);
+                 device.setLPM(lpm_enabled=true);
               if( strstr(buffer, "off") )
-                 device.setLPM(false);
+                 device.setLPM(lpm_enabled=false);
               }
             }
         }
@@ -324,26 +326,31 @@ int main(int argc, char *argv[])
 
     status_led.action(Led::LED_ON,Led::GREEN);
     while( !done ) {
-        if( status_led.color(Led::CURRENT) != Led::MAGENTA)
-            status_led.action(Led::LED_ON,Led::BLUE);
-        printf("(%04d)",msg_sent++);
-        ptr = make_message(iccid, imei);
-        sendMessage(IoTHub_client_ll_handle, ptr, strlen(ptr));
-        prty_json(ptr,strlen(ptr));
-        free(ptr);
-
-        if( status_led.color(Led::CURRENT) != Led::MAGENTA)
-            status_led.action(Led::LED_ON,Led::GREEN);
-
-        i = 0;
-        /* schedule IoTHubClient to send events/receive commands */
-        while(i < report_period && !done) {
-            IoTHubClient_LL_DoWork(IoTHub_client_ll_handle);
-            i += REPORT_PERIOD_RESOLUTION;
-            sleep(REPORT_PERIOD_RESOLUTION);
+        if( lpm_enabled ) {
+            verbose_output("Low Power Mode active, Sleeping (%3d seconds)\r",i++);
+            sleep(1);
+            }
+        else{
+            if( status_led.color(Led::CURRENT) != Led::MAGENTA)
+                status_led.action(Led::LED_ON,Led::BLUE);
+            printf("(%04d)",msg_sent++);
+            ptr = make_message(iccid, imei);
+            sendMessage(IoTHub_client_ll_handle, ptr, strlen(ptr));
+            prty_json(ptr,strlen(ptr));
+            free(ptr);
+    
+            if( status_led.color(Led::CURRENT) != Led::MAGENTA)
+                status_led.action(Led::LED_ON,Led::GREEN);
+    
+            i = 0;
+            /* schedule IoTHubClient to send events/receive commands */
+            while(i < report_period && !done) {
+                IoTHubClient_LL_DoWork(IoTHub_client_ll_handle);
+                i += REPORT_PERIOD_RESOLUTION;
+                sleep(REPORT_PERIOD_RESOLUTION);
+                }
             }
         }
-
     status_led.set_interval(125);
     status_led.action(Led::LED_BLINK,Led::RED);
 
