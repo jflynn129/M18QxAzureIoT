@@ -88,23 +88,6 @@ class Devinfo {
                 }
         }
 
-//
-// return the current connection state, usefull for when entering/exiting low power mode.
-// true if connected, false otherwise
-//
-        bool isConnected(void) { 
-            int         i;
-            json_keyval om[24];
-            char        rstr[100];
-            char        jcmd[] = "{ \"action\" : \"get_network_connection_status\" }";
-
-            memset(rstr,0x00,sizeof(rstr));
-            malptr->send_mal_command(jcmd, rstr, sizeof(rstr), true);
-            i = malptr->parse_maljson (rstr, om, sizeof(om));
-            if( i>0 && atoi(om[1].value) == 0 ) 
-                return (atoi(om[4].value) == 3);
-            return false;
-        }
 };
 
 

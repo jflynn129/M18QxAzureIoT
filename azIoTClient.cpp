@@ -57,6 +57,7 @@ int          report_period = 10;  //default to 10 second reports
 bool         verbose = false;     //default to quiet mode
 bool         done = false;        //not yet done
 bool         bb_pressed = false;  //track if the boot button is pressed
+
 bool         use_uart2 = false;   //is true when using UART2
 int          lpm_enabled = 0;     //Low Power Modes defined below...
 unsigned int click_modules = 0;   //no Click Modules present
@@ -66,6 +67,7 @@ unsigned int click_modules = 0;   //no Click Modules present
 #define ENTER_LPM  1
 #define IN_LPM     2
 #define EXIT_LPM   3
+
 
 //if using UART2, the following are needed
 struct termios options;
@@ -238,6 +240,7 @@ void verbose_output( const char * format, ... )
         int n = read(uart2_fd, buffer, sizeof(buffer));
         if( n>0 ){
             buffer[n] = '\0';
+
             printf("Read (%i bytes): %s", n, buffer);
             if( strstr(buffer,"lpm") ) {
               if( strstr(buffer, "on") )
@@ -248,6 +251,7 @@ void verbose_output( const char * format, ... )
             }
         }
     fflush(stdout);
+
 }
 
 int main(int argc, char *argv[]) 
