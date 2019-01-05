@@ -56,7 +56,6 @@ char         iccid[25];
 int          report_period = 10;  //default to 10 second reports
 bool         verbose = false;     //default to quiet mode
 bool         done = false;        //not yet done
-bool         bb_pressed = false;  //track if the boot button is pressed
 
 bool         use_uart2 = false;   //is true when using UART2
 int          lpm_enabled = 0;     //Low Power Modes defined below...
@@ -112,32 +111,19 @@ void button_release( int dur )
         status_led.set_interval(125);
         done = true;
         }
-    else{
-        switch (lpm_enabled) {
-            case NO_LPM:
-                lpm_enabled = ENTER_LPM;
-                break;
-
-            case IN_LPM:
-                lpm_enabled = EXIT_LPM;
-                break;
-
-            default: 
-                break;
-            }
-        }
-}
-
-void bb_release( int dur )
-{
-    bb_pressed = false;
-    status_led.action(Led::UNLOCK);
-    status_led.action(current_action, current_color);
 }
 
 void bb_press( void )
 {
-    bb_pressed = true;
+    current_color = status_led.color(Led::CURRENT);
+    status_led.action(Led::LED_ON,Led::WHITE);
+    current_action= status_led.action(Led::LOCK);
+}
+
+void bb_release( int dur )
+{
+    status_led.action(Led::UNLOCK);
+    status_led.action(current_action, current_color);
     switch (lpm_enabled) {
         case NO_LPM:
             lpm_enabled = ENTER_LPM;
@@ -150,9 +136,6 @@ void bb_press( void )
         default: 
             break;
         }
-    current_color = status_led.color(Led::CURRENT);
-    status_led.action(Led::LED_ON,Led::WHITE);
-    current_action= status_led.action(Led::LOCK);
 }
 
 /* Standard Report sent to Azure repeatedly */
@@ -256,12 +239,16 @@ void verbose_output( const char * format, ... )
 
 int main(int argc, char *argv[]) 
 {
-    int       i, msg_sent=1;
-    char     *ptr;
-    Wwan      wan_led;
-    void      prty_json(char* src, int srclen);
-    NTPClient ntp;
-    time_t    timestamp=-1;
+    int            i, msg_sent=1;
+    char          *ptr;
+    Wwan           wan_led;
+    void           prty_json(char* src, int srclen);
+    NTPClient      ntp;
+    time_t         timestamp=-1;
+    struct timeval time_sent, time_now;
+
+    gettimeofday(&time_sent, NULL);
+    gettimeofday(&time_now, NULL);
 
     status_led.action(Led::LED_ON,Led::RED);
     user_button.button_press_cb( button_press );
@@ -272,16 +259,20 @@ int main(int argc, char *argv[])
            case 'u':
                use_uart2 = true; 
                uart2_fd = open("/dev/ttyHSL0", O_RDWR | O_NOCTTY | O_NDELAY);
-               if (uart2_fd == -1) 
+               if (uart2_fd == -1) {
                    printf("Unable to open UART2!");
+                   exit(EXIT_FAILURE);
+                   }
                else {
                    fcntl(uart2_fd, F_SETFL, FNDELAY);
                    tcgetattr(uart2_fd, &options);
                    cfsetspeed(&options, B115200);
                    tcsetattr(uart2_fd, TCSANOW, &options);
                    int n = write(uart2_fd, "Using UART2!\n",13);
-                   if (n < 0) 
+                   if (n < 0) {
                      printf("Write to UART2 failed!");
+                     exit(EXIT_FAILURE);
+                     }
                    }
                break;
            case 'v':
@@ -361,25 +352,25 @@ int main(int argc, char *argv[])
         }
 
     status_led.action(Led::LED_ON,Led::GREEN);
+    lpm_enabled = NO_LPM;
+
     while( !done ) {
         switch (lpm_enabled) {
             case ENTER_LPM:
+                verbose_output("\nEnter Low Power Mode.\n");
+                gps.disable();
                 if( device.setLPM(true) == 0)
                     lpm_enabled = IN_LPM;
+                status_led.set_interval(2000);
+                status_led.action(Led::LED_BLINK,Led::RED);
                 break;
 
             case EXIT_LPM:
+                verbose_output("\nExit Low Power Mode.\n");
+                gps.enable();
                 if( device.setLPM(false) == 0 ) 
                     lpm_enabled = NO_LPM;
-timestamp=-1;
-i=0;
-    while( timestamp == -1 ) {
-        timestamp=ntp.get_timestamp();
-        printf("\rrestart Cellular Connection (%d)",i++);
-        fflush(stdout);
-        sleep(1);
-        }
-
+                status_led.action(Led::LED_ON,Led::GREEN);
                 break;
 
             case IN_LPM:
@@ -389,24 +380,19 @@ i=0;
                 break;
 
             case NO_LPM:
-                if( status_led.color(Led::CURRENT) != Led::MAGENTA)
+                gettimeofday(&time_now, NULL);
+                if( difftime(time_now.tv_sec, time_sent.tv_sec) >= report_period ) {
+                    time_sent = time_now;
                     status_led.action(Led::LED_ON,Led::BLUE);
-                printf("(%04d)",msg_sent++);
-                ptr = make_message(iccid, imei);
-                sendMessage(IoTHub_client_ll_handle, ptr, strlen(ptr));
-                prty_json(ptr,strlen(ptr));
-                free(ptr);
-        
-                if( status_led.color(Led::CURRENT) != Led::MAGENTA)
+                    printf("(%04d)",msg_sent++);
+                    ptr = make_message(iccid, imei);
+                    sendMessage(IoTHub_client_ll_handle, ptr, strlen(ptr));
+                    prty_json(ptr,strlen(ptr));
+                    free(ptr);
                     status_led.action(Led::LED_ON,Led::GREEN);
-        
-                i = 0;
-                /* schedule IoTHubClient to send events/receive commands */
-                while( i<report_period && !done ) {
-                    IoTHubClient_LL_DoWork(IoTHub_client_ll_handle);
-                    i += REPORT_PERIOD_RESOLUTION;
-                    sleep(REPORT_PERIOD_RESOLUTION);
                     }
+        
+                IoTHubClient_LL_DoWork(IoTHub_client_ll_handle);
                 break;
 
             }

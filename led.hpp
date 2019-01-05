@@ -7,6 +7,7 @@
 
 #include <chrono>
 #include <thread>
+#include <unistd.h>
 
 #ifndef __LED_HPP__
 #define __LED_HPP__
@@ -16,6 +17,8 @@ extern "C" {
 #include <hwlib/hwlib.h>
 }
 #endif
+
+#define RESOLUTION 25 //msec
 
 class Led {
     public:
@@ -70,6 +73,7 @@ class Led {
             if( color != CURRENT )
                 led_color=color;
             pthread_mutex_unlock(&led_mutex);
+            update_leds();
             return led_color;
             }
 
@@ -84,6 +88,7 @@ class Led {
                 set_color_on(led_color);
 
             pthread_mutex_unlock(&led_mutex);
+            update_leds();
             return last_action;
             }
             
@@ -99,6 +104,7 @@ class Led {
             else if( color != CURRENT ) 
                 led_color=color;
             pthread_mutex_unlock(&led_mutex);
+            update_leds();
             return last_action;
             }
 
@@ -127,28 +133,37 @@ class Led {
             gpio_write( blue_led,  (c&0x1)?GPIO_LEVEL_HIGH:GPIO_LEVEL_LOW );
             }
 
+        void update_leds(void) {
+            while( pthread_mutex_trylock(&led_mutex) )
+                pthread_yield();
+            if( led_action == NONE || led_action == LOCK || led_action == UNLOCK)
+                /* do nothing */;
+            else if( led_action == LED_OFF ) 
+                set_color_off();
+            else if( led_action == LED_ON ) 
+                set_color_on(led_color);
+            else if( led_action == LED_BLINK ) {
+                led_on = !led_on;
+                if( led_on ) 
+                    set_color_on(led_color);
+                else
+                    set_color_off();
+                }
+            pthread_mutex_unlock(&led_mutex);
+            }
+ 
         static void *led_task(void *thread) {
             Led *self = static_cast<Led *>(thread);
             int ret_val = 0;
+            int mscnt = 0;
 
             while ( self->led_active ) {
-                while( pthread_mutex_trylock(&self->led_mutex) )
-                    pthread_yield();
-                if( self->led_action == NONE || self->led_action == LOCK || self->led_action == UNLOCK)
-                    /* do nothing */;
-                else if( self->led_action == LED_OFF ) 
-                    self->set_color_off();
-                else if( self->led_action == LED_ON ) 
-                    self->set_color_on(self->led_color);
-                else if( self->led_action == LED_BLINK ) {
-                    self->led_on = !self->led_on;
-                    if( self->led_on ) 
-                        self->set_color_on(self->led_color);
-                    else
-                        self->set_color_off();
+                if( (self->blink_interval/RESOLUTION) < mscnt) {
+                    self->update_leds();
+                    mscnt = 0;
                     }
-                pthread_mutex_unlock(&self->led_mutex);
-                std::this_thread::sleep_for(std::chrono::milliseconds(self->blink_interval));
+                mscnt++;
+                usleep(RESOLUTION*1000);
                 }
             pthread_exit(&ret_val);
         }
