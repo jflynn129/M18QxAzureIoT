@@ -217,24 +217,33 @@ void verbose_output( const char * format, ... )
     va_end (args);
     if(verbose) 
         printf("%s",buffer);
-    if(use_uart2) {
+    if(use_uart2) 
         write(uart2_fd, buffer, strlen(buffer));
-
-        int n = read(uart2_fd, buffer, sizeof(buffer));
-        if( n>0 ){
-            buffer[n] = '\0';
-
-            printf("Read (%i bytes): %s", n, buffer);
-            if( strstr(buffer,"lpm") ) {
-              if( strstr(buffer, "on") )
-                 lpm_enabled = ENTER_LPM;
-              if( strstr(buffer, "off") )
-                 lpm_enabled = EXIT_LPM;
-              }
-            }
-        }
     fflush(stdout);
 
+}
+
+void chk_uart2_input(void) {
+    char buffer[256];
+    char buff2[256];
+
+    int n = read(uart2_fd, buffer, sizeof(buffer));
+    if( n>0 ){
+        buffer[n] = '\0';
+        sprintf(buff2,"Read (%d bytes): ",n-1);
+        write(uart2_fd, buff2,strlen(buff2));
+        sprintf(buff2,"%s\n",buffer);
+        write(uart2_fd, buff2,strlen(buff2));
+
+        if( strstr(buffer,"lpm") ) {
+            if( strstr(buffer, "on") )
+               lpm_enabled = ENTER_LPM;
+            if( strstr(buffer, "off") )
+               lpm_enabled = EXIT_LPM;
+          }
+        if( strstr(buffer, "exit") )
+             done = true;
+        }
 }
 
 int main(int argc, char *argv[]) 
@@ -396,6 +405,7 @@ int main(int argc, char *argv[])
                 break;
 
             }
+        chk_uart2_input();
         }
 
     status_led.set_interval(125);
@@ -406,7 +416,7 @@ int main(int argc, char *argv[])
     boot_button.terminate();
     mems.terminate();
 
-    if(verbose) printf("\nClosing connection to Azure IoT Hub...\n\n");
+    verbose_output("\nClosing connection to Azure IoT Hub...\n\n");
     IoTHubClient_LL_Destroy(IoTHub_client_ll_handle);
 
     status_led.terminate();
