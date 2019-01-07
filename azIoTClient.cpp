@@ -111,6 +111,7 @@ void button_release( int dur )
         status_led.set_interval(125);
         done = true;
         }
+
 }
 
 void bb_press( void )
@@ -118,6 +119,7 @@ void bb_press( void )
     current_color = status_led.color(Led::CURRENT);
     status_led.action(Led::LED_ON,Led::WHITE);
     current_action= status_led.action(Led::LOCK);
+
 }
 
 void bb_release( int dur )
@@ -136,6 +138,26 @@ void bb_release( int dur )
         default: 
             break;
         }
+}
+
+void bb_press( void )
+{
+    bb_pressed = true;
+    switch (lpm_enabled) {
+        case NO_LPM:
+            lpm_enabled = ENTER_LPM;
+            break;
+
+        case IN_LPM:
+            lpm_enabled = EXIT_LPM;
+            break;
+
+        default: 
+            break;
+        }
+    current_color = status_led.color(Led::CURRENT);
+    status_led.action(Led::LED_ON,Led::WHITE);
+    current_action= status_led.action(Led::LOCK);
 }
 
 /* Standard Report sent to Azure repeatedly */
@@ -248,6 +270,7 @@ void chk_uart2_input(void) {
 
 int main(int argc, char *argv[]) 
 {
+
     int            i, msg_sent=1;
     char          *ptr;
     Wwan           wan_led;
@@ -258,6 +281,7 @@ int main(int argc, char *argv[])
 
     gettimeofday(&time_sent, NULL);
     gettimeofday(&time_now, NULL);
+
 
     status_led.action(Led::LED_ON,Led::RED);
     user_button.button_press_cb( button_press );
@@ -272,12 +296,14 @@ int main(int argc, char *argv[])
                    printf("Unable to open UART2!");
                    exit(EXIT_FAILURE);
                    }
+
                else {
                    fcntl(uart2_fd, F_SETFL, FNDELAY);
                    tcgetattr(uart2_fd, &options);
                    cfsetspeed(&options, B115200);
                    tcsetattr(uart2_fd, TCSANOW, &options);
                    int n = write(uart2_fd, "Using UART2!\n",13);
+
                    if (n < 0) {
                      printf("Write to UART2 failed!");
                      exit(EXIT_FAILURE);
@@ -366,6 +392,7 @@ int main(int argc, char *argv[])
     while( !done ) {
         switch (lpm_enabled) {
             case ENTER_LPM:
+
                 verbose_output("\nEnter Low Power Mode.\n");
                 gps.disable();
                 if( device.setLPM(true) == 0)
@@ -389,6 +416,7 @@ int main(int argc, char *argv[])
                 break;
 
             case NO_LPM:
+
                 gettimeofday(&time_now, NULL);
                 if( difftime(time_now.tv_sec, time_sent.tv_sec) >= report_period ) {
                     time_sent = time_now;
@@ -402,6 +430,7 @@ int main(int argc, char *argv[])
                     }
         
                 IoTHubClient_LL_DoWork(IoTHub_client_ll_handle);
+
                 break;
 
             }
