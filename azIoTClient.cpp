@@ -114,18 +114,13 @@ void button_release( int dur )
 
 }
 
-void bb_press( void )
-{
-    current_color = status_led.color(Led::CURRENT);
-    status_led.action(Led::LED_ON,Led::WHITE);
-    current_action= status_led.action(Led::LOCK);
-
-}
-
 void bb_release( int dur )
 {
     status_led.action(Led::UNLOCK);
     status_led.action(current_action, current_color);
+    if( dur < 1 )
+        return;
+
     switch (lpm_enabled) {
         case NO_LPM:
             lpm_enabled = ENTER_LPM;
@@ -142,7 +137,6 @@ void bb_release( int dur )
 
 void bb_press( void )
 {
-    bb_pressed = true;
     switch (lpm_enabled) {
         case NO_LPM:
             lpm_enabled = ENTER_LPM;
@@ -249,6 +243,9 @@ void chk_uart2_input(void) {
     char buffer[256];
     char buff2[256];
 
+    if( !use_uart2 )
+        return;
+
     int n = read(uart2_fd, buffer, sizeof(buffer));
     if( n>0 ){
         buffer[n] = '\0';
@@ -272,6 +269,7 @@ int main(int argc, char *argv[])
 {
 
     int            i, msg_sent=1;
+    bool           verbose_save=verbose;
     char          *ptr;
     Wwan           wan_led;
     void           prty_json(char* src, int srclen);
@@ -392,21 +390,38 @@ int main(int argc, char *argv[])
     while( !done ) {
         switch (lpm_enabled) {
             case ENTER_LPM:
-
+                i=0;
+                verbose_save = verbose;  //while in LPM, always output status messages...
+                verbose = true;
                 verbose_output("\nEnter Low Power Mode.\n");
                 gps.disable();
                 if( device.setLPM(true) == 0)
                     lpm_enabled = IN_LPM;
+                IoTHubClient_LL_Destroy(IoTHub_client_ll_handle);
                 status_led.set_interval(2000);
                 status_led.action(Led::LED_BLINK,Led::RED);
                 break;
 
             case EXIT_LPM:
-                verbose_output("\nExit Low Power Mode.\n");
+                verbose_output("\n");
+                timestamp = -1;
+                while( timestamp == -1 ) {
+                    timestamp=ntp.get_timestamp();
+                    verbose_output("\rExit Low Power Mode, restart Cellular Connection (%d)",i++);
+                    sleep(1);
+                    }
+                verbose_output("\n\n");
+                stime(&timestamp);
+                IoTHub_client_ll_handle =setup_azure();
+                if( IoTHub_client_ll_handle == NULL ) {
+                    printf("ERROR:couldn't connect to Azure!\n");
+                    exit(EXIT_FAILURE);
+                    }
                 gps.enable();
                 if( device.setLPM(false) == 0 ) 
                     lpm_enabled = NO_LPM;
                 status_led.action(Led::LED_ON,Led::GREEN);
+                verbose = verbose_save;  //now restore verbose setting...
                 break;
 
             case IN_LPM:
@@ -430,9 +445,7 @@ int main(int argc, char *argv[])
                     }
         
                 IoTHubClient_LL_DoWork(IoTHub_client_ll_handle);
-
                 break;
-
             }
         chk_uart2_input();
         }
@@ -445,13 +458,15 @@ int main(int argc, char *argv[])
     boot_button.terminate();
     mems.terminate();
 
-    verbose_output("\nClosing connection to Azure IoT Hub...\n\n");
-    IoTHubClient_LL_Destroy(IoTHub_client_ll_handle);
+    if( !lpm_enabled ) {
+        verbose_output("\nClosing connection to Azure IoT Hub...\n\n");
+        IoTHubClient_LL_Destroy(IoTHub_client_ll_handle);
+        }
 
     status_led.terminate();
     wan_led.terminate();
 
-    printf(" - - - - - - - ALL DONE - - - - - - - \n");
+    printf(" - - - - - - - ALL DONE - - - - - - -            \n");
     exit(EXIT_SUCCESS);
 }
 
