@@ -581,9 +581,7 @@ const IO_INTERFACE_DESCRIPTION* tlsio_mbedtls_get_interface_description(void)
 static void* tlsio_mbedtls_CloneOption(const char* name, const void* value)
 {
     void* result;
-    if (
-        (name == NULL) || (value == NULL)
-        )
+    if ( name == NULL || value == NULL)
     {
         LogError("invalid parameter detected: const char* name=%p, const void* value=%p", name, value);
         result = NULL;

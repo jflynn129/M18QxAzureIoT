@@ -31,8 +31,8 @@
 #include "azIoTClient.h"
 
 //The following connection string must be updated for the individual users Azure IoT Device
-static const char* connectionString = "HostName=XXXX;DeviceId=xxxx;SharedAccessKey=xxxx";
-
+//static const char* connectionString = "HostName=XXXX;DeviceId=xxxx;SharedAccessKey=xxxx";
+static const char* connectionString = "HostName=M18QxIoTClient.azure-devices.net;DeviceId=SK2-IMEI353087080010952;SharedAccessKey=3vyDD6lO1VRCfi1bCZ58QsTUsViEZ3Q4JBErtvQzBcA=";
 
 extern void sendMessage(IOTHUB_CLIENT_LL_HANDLE iotHubClientHandle, char* buffer, size_t size);
 extern void prty_json(char* src, int srclen);
@@ -64,7 +64,7 @@ IOTHUB_CLIENT_LL_HANDLE setup_azure(void)
 {
 
     /* Setup IoTHub client configuration */
-#ifdef IOTHUBTRANSPORTHTTP_H
+#ifndef USE_MQTT
     IOTHUB_CLIENT_LL_HANDLE iotHubClientHandle = IoTHubClient_LL_CreateFromConnectionString(connectionString, HTTP_Protocol);
 #else
     IOTHUB_CLIENT_LL_HANDLE iotHubClientHandle = IoTHubClient_LL_CreateFromConnectionString(connectionString, MQTT_Protocol);
@@ -81,7 +81,9 @@ IOTHUB_CLIENT_LL_HANDLE setup_azure(void)
         return NULL;
         }
 
-#ifdef IOTHUBTRANSPORTHTTP_H
+    // add the certificate information
+
+#ifndef USE_MQTT
     // polls will happen effectively at ~10 seconds.  The default value of minimumPollingTime is 25 minutes. 
     // For more information, see:
     //     https://azure.microsoft.com/documentation/articles/iot-hub-devguide/#messaging

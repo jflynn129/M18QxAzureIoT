@@ -22,7 +22,8 @@ libmsft_azure_iot_sdk_a_CFLAGS   = -Wno-unused-variable \
                                    -Wno-unused-function \
                                    -Wno-unknown-pragmas \
                                    -Wno-maybe-uninitialized \
-                                   -Wno-enum-compare
+                                   -Wno-enum-compare \
+                                   -DENABLE_RAW_TRACE
 
 libarmtls.a: 
 	$(MAKE) -C mbedtls lib && \
@@ -124,9 +125,10 @@ libmsft_azure_iot_sdk_a_SOURCES = ./msft_azure_iot_sdk/azure-iot-sdk-c/iothub_cl
                                   ./msft_azure_iot_sdk/azure-iot-sdk-c/umqtt/src/mqtt_client.c \
                                   ./msft_azure_iot_sdk/azure-iot-sdk-c/umqtt/src/mqtt_codec.c \
                                   ./msft_azure_iot_sdk/azure-iot-sdk-c/umqtt/src/mqtt_message.c \
-                                  ./msft_azure_iot_sdk/platform/platform_linux.c  \
-                                  ./msft_azure_iot_sdk/platform/tickcounter_linux.c  \
-                                  ./msft_azure_iot_sdk/platform/tlsio_mbedtls.c 
+                                  ./msft_azure_iot_sdk/azure-iot-sdk-c/c-utility/adapters/tickcounter_linux.c  \
+                                  ./msft_azure_iot_sdk/azure-iot-sdk-c/c-utility/adapters/linux_time.c \
+                                  ./msft_azure_iot_sdk/platform/tlsio_mbedtls.c \
+                                  ./msft_azure_iot_sdk/platform/platform_linux.c  
 
 
 bin_PROGRAMS = azIoTClient 

@@ -137,18 +137,6 @@ void bb_release( int dur )
 
 void bb_press( void )
 {
-    switch (lpm_enabled) {
-        case NO_LPM:
-            lpm_enabled = ENTER_LPM;
-            break;
-
-        case IN_LPM:
-            lpm_enabled = EXIT_LPM;
-            break;
-
-        default: 
-            break;
-        }
     current_color = status_led.color(Led::CURRENT);
     status_led.action(Led::LED_ON,Led::WHITE);
     current_action= status_led.action(Led::LOCK);
@@ -431,7 +419,6 @@ int main(int argc, char *argv[])
                 break;
 
             case NO_LPM:
-
                 gettimeofday(&time_now, NULL);
                 if( difftime(time_now.tv_sec, time_sent.tv_sec) >= report_period ) {
                     time_sent = time_now;
@@ -443,7 +430,6 @@ int main(int argc, char *argv[])
                     free(ptr);
                     status_led.action(Led::LED_ON,Led::GREEN);
                     }
-        
                 IoTHubClient_LL_DoWork(IoTHub_client_ll_handle);
                 break;
             }
