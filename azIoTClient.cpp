@@ -393,6 +393,7 @@ int main(int argc, char *argv[])
             case EXIT_LPM:
                 verbose_output("\n");
                 timestamp = -1;
+                i = 0;
                 while( timestamp == -1 ) {
                     timestamp=ntp.get_timestamp();
                     verbose_output("\rExit Low Power Mode, restart Cellular Connection (%d)",i++);
