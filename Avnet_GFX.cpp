@@ -1,6 +1,8 @@
 
 #include "Avnet_GFX.h"
 #include "glcdfont.c"
+#include <stdio.h>
+#include <stdarg.h>
 
 #ifndef min
 #define min(a,b) (((a) < (b)) ? (a) : (b))
@@ -724,8 +726,7 @@ void Avnet_GFX::drawChar(int16_t x, int16_t y, unsigned char c, uint16_t color, 
                     if(size == 1) {
                         writePixel(x+xo+xx, y+yo+yy, color);
                     } else {
-                        writeFillRect(x+(xo16+xx)*size, y+(yo16+yy)*size,
-                          size, size, color);
+                        writeFillRect(x+(xo16+xx)*size, y+(yo16+yy)*size, size, size, color);
                     }
                 }
                 bits <<= 1;
@@ -734,6 +735,7 @@ void Avnet_GFX::drawChar(int16_t x, int16_t y, unsigned char c, uint16_t color, 
 
     } // End classic vs custom font
 }
+
 /*! --------------------------------------------------------------------------------
     @brief  Print one byte/character of data, used to support print()
     @param  c  The 8-bit ascii character to write
@@ -782,6 +784,18 @@ size_t Avnet_GFX::write(uint8_t c)
 
     }
     return 1;
+}
+
+size_t  Avnet_GFX::printText(const char *fmt, ...)
+{
+    char buff[255];
+    va_list ap;
+    va_start(ap, fmt);
+    vsprintf (buff,fmt, ap);
+    for( size_t i=0; i<strlen(buff); i++ )
+        write(buff[0]);
+    va_end(ap);
+    return strlen(buff);
 }
 
 /*! --------------------------------------------------------------------------------

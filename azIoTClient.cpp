@@ -282,6 +282,7 @@ int main(int argc, char *argv[])
     while((i=getopt(argc,argv,"tuvr:?")) != -1 )
         switch(i) {
            case 't':
+               printf("Testing OLED-B MicroE Click Board.");
                testOLED();
                exit(EXIT_SUCCESS);
 
