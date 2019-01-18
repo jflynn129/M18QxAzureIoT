@@ -227,6 +227,10 @@ void verbose_output( const char * format, ... )
 
 }
 
+void testOLED(void)
+{
+}
+
 void chk_uart2_input(void) {
     char buffer[256];
     char buff2[256];
@@ -248,6 +252,9 @@ void chk_uart2_input(void) {
             if( strstr(buffer, "off") )
                lpm_enabled = EXIT_LPM;
           }
+        if( strstr(buffer, "testoled") )
+            testOLED();
+
         if( strstr(buffer, "exit") )
              done = true;
         }
@@ -268,13 +275,16 @@ int main(int argc, char *argv[])
     gettimeofday(&time_sent, NULL);
     gettimeofday(&time_now, NULL);
 
-
     status_led.action(Led::LED_ON,Led::RED);
     user_button.button_press_cb( button_press );
     boot_button.button_press_cb( bb_press );
 
-    while((i=getopt(argc,argv,"uvr:?")) != -1 )
+    while((i=getopt(argc,argv,"tuvr:?")) != -1 )
         switch(i) {
+           case 't':
+               testOLED();
+               exit(EXIT_SUCCESS);
+
            case 'u':
                use_uart2 = true; 
                uart2_fd = open("/dev/ttyHSL0", O_RDWR | O_NOCTTY | O_NDELAY);
