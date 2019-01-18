@@ -1,91 +1,42 @@
 
-#include <SPI.h>
 #include <Avnet_GFX.h>
-#include <OLEDB_SSD1306.h>
+#include <oledb_ssd1306.h>
+#include <unistd.h>
+#include <stdio.h>
 
 #define SCREEN_WIDTH  96 // OLED display width, in pixels
 #define SCREEN_HEIGHT 39 // OLED display height, in pixels
 
-OLEDB_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &SPI, OLED_DC, OLED_RESET, OLED_CS);
+#define delay(x)	(usleep(x*1000))
+#define max(x,y)        ((x>y)?x:y)
+
+//GPIO_PIN_95 = reset for click module #2
+//GPIO_PIN_2 = reset for click module #1
+
+OLEDB_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, GPIO_PIN_95, GPIO_PIN_96);
 
 #define NUMFLAKES     10 // Number of snowflakes in the animation example
 
 #define LOGO_HEIGHT   16
 #define LOGO_WIDTH    16
 
-static const unsigned char logo_bmp[] =
-{ B00000000, B11000000,
-  B00000001, B11000000,
-  B00000001, B11000000,
-  B00000011, B11100000,
-  B11110011, B11100000,
-  B11111110, B11111000,
-  B01111110, B11111111,
-  B00110011, B10011111,
-  B00011111, B11111100,
-  B00001101, B01110000,
-  B00011011, B10100000,
-  B00111111, B11100000,
-  B00111111, B11110000,
-  B01111100, B11110000,
-  B01110000, B01110000,
-  B00000000, B00110000 };
-
-void setup() {
-
-  // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
-  if(!display.begin(SSD1306_SWITCHCAPVCC)) {
-    println(F("SSD1306 allocation failed"));
-    for(;;); // Don't proceed, loop forever
-  }
-
-  // Show initial display buffer contents on the screen --
-  // the library initializes this with an Adafruit splash screen.
-  display.display();
-  delay(2000); // Pause for 2 seconds
-
-  // Clear the buffer
-  display.clearDisplay();
-
-  // Draw a single pixel in white
-  display.drawPixel(10, 10, WHITE);
-  display.display();
-  delay(2000);
-
-  testdrawline();      // Draw many lines
-
-  testdrawrect();      // Draw rectangles (outlines)
-
-  testfillrect();      // Draw rectangles (filled)
-
-  testdrawcircle();    // Draw circles (outlines)
-
-  testfillcircle();    // Draw circles (filled)
-
-  testdrawroundrect(); // Draw rounded rectangles (outlines)
-
-  testfillroundrect(); // Draw rounded rectangles (filled)
-
-  testdrawtriangle();  // Draw triangles (outlines)
-
-  testfilltriangle();  // Draw triangles (filled)
-
-  testdrawchar();      // Draw characters of the default font
-
-  testdrawstyles();    // Draw 'stylized' characters
-
-  testscrolltext();    // Draw scrolling text
-
-  testdrawbitmap();    // Draw a small bitmap image
-
-  // Invert and restore display, pausing in-between
-  display.invertDisplay(true);
-  delay(1000);
-  display.invertDisplay(false);
-  delay(1000);
-
-  testanimate(logo_bmp, LOGO_WIDTH, LOGO_HEIGHT); // Animate bitmaps
-}
+static unsigned char logo_bmp[] =
+{ 0b00000000, 0b11000000,
+  0b00000001, 0b11000000,
+  0b00000001, 0b11000000,
+  0b00000011, 0b11100000,
+  0b11110011, 0b11100000,
+  0b11111110, 0b11111000,
+  0b01111110, 0b11111111,
+  0b00110011, 0b10011111,
+  0b00011111, 0b11111100,
+  0b00001101, 0b01110000,
+  0b00011011, 0b10100000,
+  0b00111111, 0b11100000,
+  0b00111111, 0b11110000,
+  0b01111100, 0b11110000,
+  0b01110000, 0b01110000,
+  0b00000000, 0b00110000 };
 
 void testdrawline() 
 {
@@ -146,7 +97,7 @@ void testdrawline()
     delay(1);
   }
 
-  delay(2000); // Pause for 2 seconds
+  sleep(2); // Pause for 2 seconds
 }
 
 void testdrawrect(void) 
@@ -159,7 +110,7 @@ void testdrawrect(void)
     delay(1);
   }
 
-  delay(2000);
+  sleep(2);
 }
 
 void testfillrect(void) 
@@ -173,7 +124,7 @@ void testfillrect(void)
     delay(1);
   }
 
-  delay(2000);
+  sleep(2);
 }
 
 void testdrawcircle(void) 
@@ -186,7 +137,7 @@ void testdrawcircle(void)
     delay(1);
   }
 
-  delay(2000);
+  sleep(2);
 }
 
 void testfillcircle(void) 
@@ -200,7 +151,7 @@ void testfillcircle(void)
     delay(1);
   }
 
-  delay(2000);
+  sleep(2);
 }
 
 void testdrawroundrect(void) 
@@ -214,7 +165,7 @@ void testdrawroundrect(void)
     delay(1);
   }
 
-  delay(2000);
+  sleep(2);
 }
 
 void testfillroundrect(void) 
@@ -229,7 +180,7 @@ void testfillroundrect(void)
     delay(1);
   }
 
-  delay(2000);
+  sleep(2);
 }
 
 void testdrawtriangle(void) 
@@ -245,7 +196,7 @@ void testdrawtriangle(void)
     delay(1);
   }
 
-  delay(2000);
+  sleep(2);
 }
 
 void testfilltriangle(void) 
@@ -262,7 +213,7 @@ void testfilltriangle(void)
     delay(1);
   }
 
-  delay(2000);
+  sleep(2);
 }
 
 void testdrawchar(void) 
@@ -282,11 +233,12 @@ void testdrawchar(void)
   }
 
   display.display();
-  delay(2000);
+  sleep(2);
 }
 
 void testdrawstyles(void) 
 {
+#if 0
   display.clearDisplay();
 
   display.setTextSize(1);             // Normal 1:1 pixel scale
@@ -302,11 +254,13 @@ void testdrawstyles(void)
   display.print(F("0x")); display.println(0xDEADBEEF, HEX);
 
   display.display();
-  delay(2000);
+  sleep(2);
+#endif
 }
 
 void testscrolltext(void) 
 {
+#if 0
   display.clearDisplay();
 
   display.setTextSize(2); // Draw 2X-scale text
@@ -318,19 +272,20 @@ void testscrolltext(void)
 
   // Scroll in various directions, pausing in-between:
   display.startscrollright(0x00, 0x0F);
-  delay(2000);
+  sleep(2);
   display.stopscroll();
-  delay(1000);
+  sleep(1);
   display.startscrollleft(0x00, 0x0F);
-  delay(2000);
+  sleep(2);
   display.stopscroll();
-  delay(1000);
+  sleep(1);
   display.startscrolldiagright(0x00, 0x07);
-  delay(2000);
+  sleep(2);
   display.startscrolldiagleft(0x00, 0x07);
-  delay(2000);
+  sleep(2);
   display.stopscroll();
-  delay(1000);
+  sleep(1);
+#endif
 }
 
 void testdrawbitmap(void) 
@@ -342,7 +297,7 @@ void testdrawbitmap(void)
     (display.height() - LOGO_HEIGHT) / 2,
     logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
   display.display();
-  delay(1000);
+  delay(1);
 }
 
 #define XPOS   0 // Indexes into the 'icons' array in function below
@@ -351,6 +306,8 @@ void testdrawbitmap(void)
 
 void testanimate(const uint8_t *bitmap, uint8_t w, uint8_t h) 
 {
+  return;
+#if 0
   int8_t f, icons[NUMFLAKES][3];
 
   // Initialize 'snowflake' positions
@@ -389,4 +346,74 @@ void testanimate(const uint8_t *bitmap, uint8_t w, uint8_t h)
       }
     }
   }
+#endif
 }
+
+
+void do_oled_test() {
+
+  printf("Running OLED test...\n");
+
+
+  printf("clear the display buffer\n");
+  display.clearDisplay();
+
+  sleep(2); // Pause for 2 seconds
+
+  printf("Draw a single pixel in white\n");
+  display.drawPixel(10, 10, WHITE);
+  display.display();
+  sleep(2);
+
+#if 0
+  printf("Draw many lines\n");
+  testdrawline();      // Draw many lines
+
+  printf("Draw rectangles (outlines)\n");
+  testdrawrect();      // Draw rectangles (outlines)
+
+  printf("Draw rectangles (filled)\n");
+  testfillrect();      // Draw rectangles (filled)
+
+  printf("Draw circles (outlines)\n");
+  testdrawcircle();    // Draw circles (outlines)
+
+  printf("Draw circles (filled)\n");
+  testfillcircle();    // Draw circles (filled)
+
+  printf("Draw rounded rectangles (outlines)\n");
+  testdrawroundrect(); // Draw rounded rectangles (outlines)
+
+  printf("Draw rounded rectangles (filled)\n");
+  testfillroundrect(); // Draw rounded rectangles (filled)
+
+  printf("Draw triangles (outlines)\n");
+  testdrawtriangle();  // Draw triangles (outlines)
+
+  printf("Draw triangles (filled)\n");
+  testfilltriangle();  // Draw triangles (filled)
+
+  printf("Draw characters of the default font\n");
+  testdrawchar();      // Draw characters of the default font
+
+  printf("Draw 'stylized' characters\n");
+  testdrawstyles();    // Draw 'stylized' characters
+
+  printf("Draw scrolling text\n");
+  testscrolltext();    // Draw scrolling text
+
+  printf("Draw a small bitmap image\n");
+  testdrawbitmap();    // Draw a small bitmap image
+
+  printf("Invert display\n");
+  // Invert and restore display, pausing in-between
+  display.invertDisplay(true);
+  sleep(1);
+  printf("Restore display\n");
+  display.invertDisplay(false);
+  sleep(1);
+
+  testanimate(logo_bmp, LOGO_WIDTH, LOGO_HEIGHT); // Animate bitmaps
+#endif
+}
+

@@ -229,4 +229,3 @@ While running, The LED's on the M18Qx indicate various things:
 
 
 
-# mqtt_test
