@@ -1,29 +1,8 @@
 
 #include "Avnet_GFX.h"
 #include "glcdfont.c"
-
-// Many (but maybe not all) non-AVR board installs define macros
-// for compatibility with existing PROGMEM-reading AVR code.
-// Do our own checks and defines here for good measure...
-
-#ifndef pgm_read_byte
- #define pgm_read_byte(addr) (*(const unsigned char *)(addr))
-#endif
-#ifndef pgm_read_word
- #define pgm_read_word(addr) (*(const unsigned short *)(addr))
-#endif
-#ifndef pgm_read_dword
- #define pgm_read_dword(addr) (*(const unsigned long *)(addr))
-#endif
-
-// Pointers are a peculiar case...typically 16-bit on AVR boards,
-// 32 bits elsewhere.  Try to accommodate both...
-
-#if !defined(__INT_MAX__) || (__INT_MAX__ > 0xFFFF)
- #define pgm_read_pointer(addr) ((void *)pgm_read_dword(addr))
-#else
- #define pgm_read_pointer(addr) ((void *)pgm_read_word(addr))
-#endif
+#include <stdio.h>
+#include <stdarg.h>
 
 #ifndef min
 #define min(a,b) (((a) < (b)) ? (a) : (b))
@@ -49,7 +28,6 @@ WIDTH(w), HEIGHT(h)
     textcolor = textbgcolor = 0xFFFF;
     wrap      = true;
     _cp437    = false;
-    gfxFont   = NULL;
 }
 
 /*! --------------------------------------------------------------------------------
@@ -523,56 +501,7 @@ void Avnet_GFX::fillTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int
     }
 }
 
-// BITMAP / XBITMAP / GRAYSCALE / RGB BITMAP FUNCTIONS ---------------------
-
-/*! --------------------------------------------------------------------------------
-*  @brief      Draw a 1-bit image at the specified (x,y) position, using specified foreground color (unset bits are transparent).
-*   @param    x   Top left corner x coordinate
-*   @param    y   Top left corner y coordinate
-*   @param    bitmap  byte array with monochrome bitmap
-*   @param    w   Width of bitmap in pixels
-*   @param    h   Hieght of bitmap in pixels
-*   @param    color 16-bit 5-6-5 Color to draw with
-*/
-void Avnet_GFX::drawBitmap(int16_t x, int16_t y, const uint8_t bitmap[], int16_t w, int16_t h, uint16_t color) 
-{
-
-    int16_t byteWidth = (w + 7) / 8; // Bitmap scanline pad = whole byte
-    uint8_t byte = 0;
-
-    for(int16_t j=0; j<h; j++, y++) {
-        for(int16_t i=0; i<w; i++) {
-            if(i & 7) byte <<= 1;
-            else      byte   = pgm_read_byte(&bitmap[j * byteWidth + i / 8]);
-            if(byte & 0x80) writePixel(x+i, y, color);
-        }
-    }
-}
-
-/*! --------------------------------------------------------------------------------
-*  @brief      Draw a 1-bit image at the specified (x,y) position, with foreground (for set bits) and background (unset bits) colors
-*   @param    x   Top left corner x coordinate
-*   @param    y   Top left corner y coordinate
-*   @param    bitmap  byte array with monochrome bitmap
-*   @param    w   Width of bitmap in pixels
-*   @param    h   Hieght of bitmap in pixels
-*   @param    color 16-bit 5-6-5 Color to draw pixels with
-*   @param    bg 16-bit 5-6-5 Color to draw background with
-*/
-void Avnet_GFX::drawBitmap(int16_t x, int16_t y, const uint8_t bitmap[], int16_t w, int16_t h, uint16_t color, uint16_t bg) 
-{
-
-    int16_t byteWidth = (w + 7) / 8; // Bitmap scanline pad = whole byte
-    uint8_t byte = 0;
-
-    for(int16_t j=0; j<h; j++, y++) {
-        for(int16_t i=0; i<w; i++ ) {
-            if(i & 7) byte <<= 1;
-            else      byte   = pgm_read_byte(&bitmap[j * byteWidth + i / 8]);
-            writePixel(x+i, y, (byte & 0x80) ? color : bg);
-        }
-    }
-}
+// BITMAP FUNCTIONS ----------------------------------------------------------------
 
 /*! --------------------------------------------------------------------------------
    @brief      Draw a RAM-resident 1-bit image at the specified (x,y) position, using the specified foreground color (unset bits are transparent).
@@ -636,7 +565,7 @@ void Avnet_GFX::drawBitmap(int16_t x, int16_t y, uint8_t *bitmap, int16_t w, int
     @param    h   Hieght of bitmap in pixels
     @param    color 16-bit 5-6-5 Color to draw pixels with
 */
-void Avnet_GFX::drawXBitmap(int16_t x, int16_t y, const uint8_t bitmap[], int16_t w, int16_t h, uint16_t color) 
+void Avnet_GFX::drawXBitmap(int16_t x, int16_t y, uint8_t bitmap[], int16_t w, int16_t h, uint16_t color) 
 {
 
     int16_t byteWidth = (w + 7) / 8; // Bitmap scanline pad = whole byte
@@ -645,7 +574,7 @@ void Avnet_GFX::drawXBitmap(int16_t x, int16_t y, const uint8_t bitmap[], int16_
     for(int16_t j=0; j<h; j++, y++) {
         for(int16_t i=0; i<w; i++ ) {
             if(i & 7) byte >>= 1;
-            else      byte   = pgm_read_byte(&bitmap[j * byteWidth + i / 8]);
+            else      byte   = (bitmap[j * byteWidth + i / 8]);
             // Nearly identical to drawBitmap(), only the bit order
             // is reversed here (left-to-right = LSB to MSB):
             if(byte & 0x01) writePixel(x+i, y, color);
@@ -655,26 +584,7 @@ void Avnet_GFX::drawXBitmap(int16_t x, int16_t y, const uint8_t bitmap[], int16_
 
 
 /*! --------------------------------------------------------------------------------
-   @brief   Draw a PROGMEM-resident 8-bit image (grayscale) at the specified (x,y) pos.  
-   Specifically for 8-bit display devices such as IS31FL3731; no color reduction/expansion is performed.
-    @param    x   Top left corner x coordinate
-    @param    y   Top left corner y coordinate
-    @param    bitmap  byte array with grayscale bitmap
-    @param    w   Width of bitmap in pixels
-    @param    h   Hieght of bitmap in pixels
-*/
-void Avnet_GFX::drawGrayscaleBitmap(int16_t x, int16_t y, const uint8_t bitmap[], int16_t w, int16_t h) 
-{
-    for(int16_t j=0; j<h; j++, y++) {
-        for(int16_t i=0; i<w; i++ ) {
-            writePixel(x+i, y, (uint8_t)pgm_read_byte(&bitmap[j * w + i]));
-        }
-    }
-}
-
-/*! --------------------------------------------------------------------------------
    @brief   Draw a RAM-resident 8-bit image (grayscale) at the specified (x,y) pos.  
-   Specifically for 8-bit display devices such as IS31FL3731; no color reduction/expansion is performed.
     @param    x   Top left corner x coordinate
     @param    y   Top left corner y coordinate
     @param    bitmap  byte array with grayscale bitmap
@@ -690,33 +600,6 @@ void Avnet_GFX::drawGrayscaleBitmap(int16_t x, int16_t y, uint8_t *bitmap, int16
     }
 }
 
-
-/*! --------------------------------------------------------------------------------
-   @brief   Draw a PROGMEM-resident 8-bit image (grayscale) with a 1-bit mask
-   (set bits = opaque, unset bits = clear) at the specified (x,y) position.
-   BOTH buffers (grayscale and mask) must be PROGMEM-resident.
-   Specifically for 8-bit display devices such as IS31FL3731; no color reduction/expansion is performed.
-    @param    x   Top left corner x coordinate
-    @param    y   Top left corner y coordinate
-    @param    bitmap  byte array with grayscale bitmap
-    @param    mask  byte array with mask bitmap
-    @param    w   Width of bitmap in pixels
-    @param    h   Height of bitmap in pixels
-*/
-void Avnet_GFX::drawGrayscaleBitmap(int16_t x, int16_t y, const uint8_t bitmap[], const uint8_t mask[], int16_t w, int16_t h) 
-{
-    int16_t bw   = (w + 7) / 8; // Bitmask scanline pad = whole byte
-    uint8_t byte = 0;
-    for(int16_t j=0; j<h; j++, y++) {
-        for(int16_t i=0; i<w; i++ ) {
-            if(i & 7) byte <<= 1;
-            else      byte   = pgm_read_byte(&mask[j * bw + i / 8]);
-            if(byte & 0x80) {
-                writePixel(x+i, y, (uint8_t)pgm_read_byte(&bitmap[j * w + i]));
-            }
-        }
-    }
-}
 
 /*! --------------------------------------------------------------------------------
    @brief   Draw a RAM-resident 8-bit image (grayscale) with a 1-bit mask
@@ -746,91 +629,6 @@ void Avnet_GFX::drawGrayscaleBitmap(int16_t x, int16_t y, uint8_t *bitmap, uint8
 }
 
 
-/*! --------------------------------------------------------------------------------
-   @brief   Draw a PROGMEM-resident 16-bit image (RGB 5/6/5) at the specified (x,y) position.  
-   For 16-bit display devices; no color reduction performed.
-    @param    x   Top left corner x coordinate
-    @param    y   Top left corner y coordinate
-    @param    bitmap  byte array with 16-bit color bitmap
-    @param    w   Width of bitmap in pixels
-    @param    h   Height of bitmap in pixels
-*/
-void Avnet_GFX::drawRGBBitmap(int16_t x, int16_t y, const uint16_t bitmap[], int16_t w, int16_t h) 
-{
-    for(int16_t j=0; j<h; j++, y++) {
-        for(int16_t i=0; i<w; i++ ) {
-            writePixel(x+i, y, pgm_read_word(&bitmap[j * w + i]));
-        }
-    }
-}
-
-/*! --------------------------------------------------------------------------------
-   @brief   Draw a RAM-resident 16-bit image (RGB 5/6/5) at the specified (x,y) position.  
-   For 16-bit display devices; no color reduction performed.
-    @param    x   Top left corner x coordinate
-    @param    y   Top left corner y coordinate
-    @param    bitmap  byte array with 16-bit color bitmap
-    @param    w   Width of bitmap in pixels
-    @param    h   Height of bitmap in pixels
-*/
-void Avnet_GFX::drawRGBBitmap(int16_t x, int16_t y, uint16_t *bitmap, int16_t w, int16_t h) 
-{
-    for(int16_t j=0; j<h; j++, y++) {
-        for(int16_t i=0; i<w; i++ ) {
-            writePixel(x+i, y, bitmap[j * w + i]);
-        }
-    }
-}
-
-
-/*! --------------------------------------------------------------------------------
-   @brief   Draw a PROGMEM-resident 16-bit image (RGB 5/6/5) with a 1-bit mask (set bits = opaque, unset bits = clear) at the specified (x,y) position. BOTH buffers (color and mask) must be PROGMEM-resident. For 16-bit display devices; no color reduction performed.
-    @param    x   Top left corner x coordinate
-    @param    y   Top left corner y coordinate
-    @param    bitmap  byte array with 16-bit color bitmap
-    @param    mask  byte array with monochrome mask bitmap
-    @param    w   Width of bitmap in pixels
-    @param    h   Height of bitmap in pixels
-*/
-void Avnet_GFX::drawRGBBitmap(int16_t x, int16_t y, const uint16_t bitmap[], const uint8_t mask[], int16_t w, int16_t h) 
-{
-    int16_t bw   = (w + 7) / 8; // Bitmask scanline pad = whole byte
-    uint8_t byte = 0;
-    for(int16_t j=0; j<h; j++, y++) {
-        for(int16_t i=0; i<w; i++ ) {
-            if(i & 7) byte <<= 1;
-            else      byte   = pgm_read_byte(&mask[j * bw + i / 8]);
-            if(byte & 0x80) {
-                writePixel(x+i, y, pgm_read_word(&bitmap[j * w + i]));
-            }
-        }
-    }
-}
-
-/*! --------------------------------------------------------------------------------
-   @brief   Draw a RAM-resident 16-bit image (RGB 5/6/5) with a 1-bit mask (set bits = opaque, unset bits = clear) at the specified (x,y) position. BOTH buffers (color and mask) must be RAM-resident. For 16-bit display devices; no color reduction performed.
-    @param    x   Top left corner x coordinate
-    @param    y   Top left corner y coordinate
-    @param    bitmap  byte array with 16-bit color bitmap
-    @param    mask  byte array with monochrome mask bitmap
-    @param    w   Width of bitmap in pixels
-    @param    h   Height of bitmap in pixels
-*/
-void Avnet_GFX::drawRGBBitmap(int16_t x, int16_t y, uint16_t *bitmap, uint8_t *mask, int16_t w, int16_t h) 
-{
-    int16_t bw   = (w + 7) / 8; // Bitmask scanline pad = whole byte
-    uint8_t byte = 0;
-    for(int16_t j=0; j<h; j++, y++) {
-        for(int16_t i=0; i<w; i++ ) {
-            if(i & 7) byte <<= 1;
-            else      byte   = mask[j * bw + i / 8];
-            if(byte & 0x80) {
-                writePixel(x+i, y, bitmap[j * w + i]);
-            }
-        }
-    }
-}
-
 // TEXT- AND CHARACTER-HANDLING FUNCTIONS ----------------------------------
 
 // Draw a character
@@ -845,146 +643,71 @@ void Avnet_GFX::drawRGBBitmap(int16_t x, int16_t y, uint16_t *bitmap, uint8_t *m
 */
 void Avnet_GFX::drawChar(int16_t x, int16_t y, unsigned char c, uint16_t color, uint16_t bg, uint8_t size) 
 {
+    if((x >= _width)            || // Clip right
+       (y >= _height)           || // Clip bottom
+       ((x + 6 * size - 1) < 0) || // Clip left
+       ((y + 8 * size - 1) < 0))   // Clip top
+        return;
 
-    if(!gfxFont) { // 'Classic' built-in font
+    if(!_cp437 && (c >= 176)) c++; // Handle 'classic' charset behavior
 
-        if((x >= _width)            || // Clip right
-           (y >= _height)           || // Clip bottom
-           ((x + 6 * size - 1) < 0) || // Clip left
-           ((y + 8 * size - 1) < 0))   // Clip top
-            return;
-
-        if(!_cp437 && (c >= 176)) c++; // Handle 'classic' charset behavior
-
-        for(int8_t i=0; i<5; i++ ) { // Char bitmap = 5 columns
-            uint8_t line = pgm_read_byte(&font[c * 5 + i]);
-            for(int8_t j=0; j<8; j++, line >>= 1) {
-                if(line & 1) {
-                    if(size == 1)
-                        writePixel(x+i, y+j, color);
-                    else
-                        writeFillRect(x+i*size, y+j*size, size, size, color);
-                } else if(bg != color) {
-                    if(size == 1)
-                        writePixel(x+i, y+j, bg);
-                    else
-                        writeFillRect(x+i*size, y+j*size, size, size, bg);
+    for(int8_t i=0; i<5; i++ ) { // Char bitmap = 5 columns
+        uint8_t line = (font[c * 5 + i]);
+        for(int8_t j=0; j<8; j++, line >>= 1) {
+            if(line & 1) {
+                if(size == 1)
+                    writePixel(x+i, y+j, color);
+                else
+                    writeFillRect(x+i*size, y+j*size, size, size, color);
+                } 
+            else if(bg != color) {
+                if(size == 1)
+                    writePixel(x+i, y+j, bg);
+                else
+                    writeFillRect(x+i*size, y+j*size, size, size, bg);
                 }
             }
         }
         if(bg != color) { // If opaque, draw vertical line for last column
-            if(size == 1) writeFastVLine(x+5, y, 8, bg);
-            else          writeFillRect(x+5*size, y, size, 8*size, bg);
+            if(size == 1) 
+                writeFastVLine(x+5, y, 8, bg);
+            else 
+                writeFillRect(x+5*size, y, size, 8*size, bg);
         }
 
-    } else { // Custom font
-
-        // Character is assumed previously filtered by write() to eliminate
-        // newlines, returns, non-printable characters, etc.  Calling
-        // drawChar() directly with 'bad' characters of font may cause mayhem!
-
-        c -= (uint8_t)pgm_read_byte(&gfxFont->first);
-        GFXglyph *glyph  = &(((GFXglyph *)pgm_read_pointer(&gfxFont->glyph))[c]);
-        uint8_t  *bitmap = (uint8_t *)pgm_read_pointer(&gfxFont->bitmap);
-
-        uint16_t bo = pgm_read_word(&glyph->bitmapOffset);
-        uint8_t  w  = pgm_read_byte(&glyph->width),
-                 h  = pgm_read_byte(&glyph->height);
-        int8_t   xo = pgm_read_byte(&glyph->xOffset),
-                 yo = pgm_read_byte(&glyph->yOffset);
-        uint8_t  xx, yy, bits = 0, bit = 0;
-        int16_t  xo16 = 0, yo16 = 0;
-
-        if(size > 1) {
-            xo16 = xo;
-            yo16 = yo;
-        }
-
-        // Todo: Add character clipping here
-
-        // NOTE: THERE IS NO 'BACKGROUND' COLOR OPTION ON CUSTOM FONTS.
-        // THIS IS ON PURPOSE AND BY DESIGN.  The background color feature
-        // has typically been used with the 'classic' font to overwrite old
-        // screen contents with new data.  This ONLY works because the
-        // characters are a uniform size; it's not a sensible thing to do with
-        // proportionally-spaced fonts with glyphs of varying sizes (and that
-        // may overlap).  To replace previously-drawn text when using a custom
-        // font, use the getTextBounds() function to determine the smallest
-        // rectangle encompassing a string, erase the area with fillRect(),
-        // then draw new text.  This WILL infortunately 'blink' the text, but
-        // is unavoidable.  Drawing 'background' pixels will NOT fix this,
-        // only creates a new set of problems.  Have an idea to work around
-        // this (a canvas object type for MCUs that can afford the RAM and
-        // displays supporting setAddrWindow() and pushColors()), but haven't
-        // implemented this yet.
-
-        for(yy=0; yy<h; yy++) {
-            for(xx=0; xx<w; xx++) {
-                if(!(bit++ & 7)) {
-                    bits = pgm_read_byte(&bitmap[bo++]);
-                }
-                if(bits & 0x80) {
-                    if(size == 1) {
-                        writePixel(x+xo+xx, y+yo+yy, color);
-                    } else {
-                        writeFillRect(x+(xo16+xx)*size, y+(yo16+yy)*size,
-                          size, size, color);
-                    }
-                }
-                bits <<= 1;
-            }
-        }
-
-    } // End classic vs custom font
 }
+
 /*! --------------------------------------------------------------------------------
     @brief  Print one byte/character of data, used to support print()
     @param  c  The 8-bit ascii character to write
 */
 size_t Avnet_GFX::write(uint8_t c) 
 {
-    if(!gfxFont) { // 'Classic' built-in font
-
-        if(c == '\n') {                        // Newline?
-            cursor_x  = 0;                     // Reset x to zero,
-            cursor_y += textsize * 8;          // advance y one line
-        } else if(c != '\r') {                 // Ignore carriage returns
-            if(wrap && ((cursor_x + textsize * 6) > _width)) { // Off right?
-                cursor_x  = 0;                 // Reset x to zero,
-                cursor_y += textsize * 8;      // advance y one line
+    if(c == '\n') {                        // Newline?
+        cursor_x  = 0;                     // Reset x to zero,
+        cursor_y += (textsize * 8);        // advance y one line
+        } 
+    else if(c != '\r') {                 // Ignore carriage returns
+        if(wrap && ((cursor_x + textsize * 6) > _width)) { // Off right?
+            cursor_x  = 0;                 // Reset x to zero,
+            cursor_y += textsize * 8;      // advance y one line
             }
-            drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize);
-            cursor_x += textsize * 6;          // Advance x one char
+        drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize);
+        cursor_x += textsize * 6;          // Advance x one char
         }
-
-    } else { // Custom font
-
-        if(c == '\n') {
-            cursor_x  = 0;
-            cursor_y += (int16_t)textsize *
-                        (uint8_t)pgm_read_byte(&gfxFont->yAdvance);
-        } else if(c != '\r') {
-            uint8_t first = pgm_read_byte(&gfxFont->first);
-            if((c >= first) && (c <= (uint8_t)pgm_read_byte(&gfxFont->last))) {
-                GFXglyph *glyph = &(((GFXglyph *)pgm_read_pointer(
-                  &gfxFont->glyph))[c - first]);
-                uint8_t   w     = pgm_read_byte(&glyph->width),
-                          h     = pgm_read_byte(&glyph->height);
-                if((w > 0) && (h > 0)) { // Is there an associated bitmap?
-                    int16_t xo = (int8_t)pgm_read_byte(&glyph->xOffset); // sic
-                    if(wrap && ((cursor_x + textsize * (xo + w)) > _width)) {
-                        cursor_x  = 0;
-                        cursor_y += (int16_t)textsize *
-                          (uint8_t)pgm_read_byte(&gfxFont->yAdvance);
-                    }
-                    drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize);
-                }
-                cursor_x += (uint8_t)pgm_read_byte(&glyph->xAdvance) * (int16_t)textsize;
-            }
-        }
-
-    }
     return 1;
+}
+
+size_t  Avnet_GFX::printText(const char *fmt, ...)
+{
+    char buff[255];
+    va_list ap;
+    va_start(ap, fmt);
+    vsprintf (buff,fmt, ap);
+    for( size_t i=0; i<strlen(buff); i++ )
+        write(buff[i]);
+    va_end(ap);
+    return strlen(buff);
 }
 
 /*! --------------------------------------------------------------------------------
@@ -998,13 +721,13 @@ void Avnet_GFX::setCursor(int16_t x, int16_t y) { cursor_x = x; cursor_y = y; }
     @brief  Get text cursor X location
     @returns    X coordinate in pixels
 */
-int16_t Avnet_GFX::getCursorX(void) const { return cursor_x; }
+int16_t Avnet_GFX::getCursorX(void) { return cursor_x; }
 
 /*! --------------------------------------------------------------------------------
     @brief      Get text cursor Y location
     @returns    Y coordinate in pixels
 */
-int16_t Avnet_GFX::getCursorY(void) const { return cursor_y; }
+int16_t Avnet_GFX::getCursorY(void) { return cursor_y; }
 
 /*! --------------------------------------------------------------------------------
     @brief   Set text 'magnification' size. Each increase in s makes 1 pixel that much bigger.
@@ -1024,23 +747,29 @@ void Avnet_GFX::setTextColor(uint16_t c)
 }
 
 /*! --------------------------------------------------------------------------------
-    @brief   Set text font color with custom background color
+    @brief   Set text font color with transparant background
     @param   c   16-bit 5-6-5 Color to draw text with
-    @param   b   16-bit 5-6-5 Color to draw background/fill with
+    @param   b   16-bit 5-6-5 Color to draw text with
 */
-void Avnet_GFX::setTextColor(uint16_t c, uint16_t b) { textcolor   = c; textbgcolor = b; }
+void Avnet_GFX::setTextColor(uint16_t c, uint16_t b) 
+{
+    // For 'transparent' background, we'll set the bg
+    // to the same as fg instead of using a flag
+    textcolor  = c; 
+    textbgcolor= b;
+}
 
 /*! --------------------------------------------------------------------------------
     @brief      Whether text that is too long should 'wrap' around to the next line.
     @param  w Set true for wrapping, false for clipping
 */
-void Avnet_GFX::setTextWrap(boolean w) { wrap = w; }
+void Avnet_GFX::setTextWrap(bool w) { wrap = w; }
 
 /*! --------------------------------------------------------------------------------
     @brief      Get rotation setting for display
     @returns    0 thru 3 corresponding to 4 cardinal rotations
 */
-uint8_t Avnet_GFX::getRotation(void) const { return rotation; }
+uint8_t Avnet_GFX::getRotation(void) { return rotation; }
 
 /*! --------------------------------------------------------------------------------
     @brief      Set rotation setting for display
@@ -1073,27 +802,7 @@ void Avnet_GFX::setRotation(uint8_t x)
     to this function to use correct CP437 character values in your code.
     @param  x  Whether to enable (True) or not (False)
 */
-void Avnet_GFX::cp437(boolean x) { _cp437 = x; }
-
-/*! --------------------------------------------------------------------------------
-    @brief Set the font to display when print()ing, either custom or default
-    @param  f  The GFXfont object, if NULL use built in 6x8 font
-*/
-void Avnet_GFX::setFont(const GFXfont *f) 
-{
-    if(f) {            // Font struct pointer passed in?
-        if(!gfxFont) { // And no current font struct?
-            // Switching from classic to new font behavior.
-            // Move cursor pos down 6 pixels so it's on baseline.
-            cursor_y += 6;
-        }
-    } else if(gfxFont) { // NULL passed.  Current font struct defined?
-        // Switching from new to classic font behavior.
-        // Move cursor pos up 6 pixels so it's at top-left of char.
-        cursor_y -= 6;
-    }
-    gfxFont = (GFXfont *)f;
-}
+void Avnet_GFX::cp437(bool x) { _cp437 = x; }
 
 
 /*! --------------------------------------------------------------------------------
@@ -1109,59 +818,23 @@ void Avnet_GFX::setFont(const GFXfont *f)
 */
 void Avnet_GFX::charBounds(char c, int16_t *x, int16_t *y, int16_t *minx, int16_t *miny, int16_t *maxx, int16_t *maxy) 
 {
-
-    if(gfxFont) {
-
-        if(c == '\n') { // Newline?
-            *x  = 0;    // Reset x to zero, advance y by one line
-            *y += textsize * (uint8_t)pgm_read_byte(&gfxFont->yAdvance);
-        } else if(c != '\r') { // Not a carriage return; is normal char
-            uint8_t first = pgm_read_byte(&gfxFont->first),
-                    last  = pgm_read_byte(&gfxFont->last);
-            if((c >= first) && (c <= last)) { // Char present in this font?
-                GFXglyph *glyph = &(((GFXglyph *)pgm_read_pointer(
-                  &gfxFont->glyph))[c - first]);
-                uint8_t gw = pgm_read_byte(&glyph->width),
-                        gh = pgm_read_byte(&glyph->height),
-                        xa = pgm_read_byte(&glyph->xAdvance);
-                int8_t  xo = pgm_read_byte(&glyph->xOffset),
-                        yo = pgm_read_byte(&glyph->yOffset);
-                if(wrap && ((*x+(((int16_t)xo+gw)*textsize)) > _width)) {
-                    *x  = 0; // Reset x to zero, advance y by one line
-                    *y += textsize * (uint8_t)pgm_read_byte(&gfxFont->yAdvance);
-                }
-                int16_t ts = (int16_t)textsize,
-                        x1 = *x + xo * ts,
-                        y1 = *y + yo * ts,
-                        x2 = x1 + gw * ts - 1,
-                        y2 = y1 + gh * ts - 1;
-                if(x1 < *minx) *minx = x1;
-                if(y1 < *miny) *miny = y1;
-                if(x2 > *maxx) *maxx = x2;
-                if(y2 > *maxy) *maxy = y2;
-                *x += xa * ts;
+    if(c == '\n') {                     // Newline?
+        *x  = 0;                        // Reset x to zero,
+        *y += textsize * 8;             // advance y one line
+        // min/max x/y unchaged -- that waits for next 'normal' character
+        } 
+    else if(c != '\r') {  // Normal char; ignore carriage returns
+        if(wrap && ((*x + textsize * 6) > _width)) { // Off right?
+            *x  = 0;                    // Reset x to zero,
+            *y += textsize * 8;         // advance y one line
             }
-        }
-
-    } else { // Default font
-
-        if(c == '\n') {                     // Newline?
-            *x  = 0;                        // Reset x to zero,
-            *y += textsize * 8;             // advance y one line
-            // min/max x/y unchaged -- that waits for next 'normal' character
-        } else if(c != '\r') {  // Normal char; ignore carriage returns
-            if(wrap && ((*x + textsize * 6) > _width)) { // Off right?
-                *x  = 0;                    // Reset x to zero,
-                *y += textsize * 8;         // advance y one line
-            }
-            int x2 = *x + textsize * 6 - 1, // Lower-right pixel of char
-                y2 = *y + textsize * 8 - 1;
-            if(x2 > *maxx) *maxx = x2;      // Track max x, y
-            if(y2 > *maxy) *maxy = y2;
-            if(*x < *minx) *minx = *x;      // Track min x, y
-            if(*y < *miny) *miny = *y;
-            *x += textsize * 6;             // Advance x one char
-        }
+        int x2 = *x + textsize * 6 - 1; // Lower-right pixel of char
+        int y2 = *y + textsize * 8 - 1;
+        if(x2 > *maxx) *maxx = x2;      // Track max x, y
+        if(y2 > *maxy) *maxy = y2;
+        if(*x < *minx) *minx = *x;      // Track min x, y
+        if(*y < *miny) *miny = *y;
+        *x += textsize * 6;             // Advance x one char
     }
 }
 
@@ -1175,7 +848,7 @@ void Avnet_GFX::charBounds(char c, int16_t *x, int16_t *y, int16_t *minx, int16_
     @param    w      The boundary width, set by function
     @param    h      The boundary height, set by function
 */
-void Avnet_GFX::getTextBounds(const char *str, int16_t x, int16_t y, int16_t *x1, int16_t *y1, uint16_t *w, uint16_t *h) 
+void Avnet_GFX::getTextBounds(char *str, int16_t x, int16_t y, int16_t *x1, int16_t *y1, uint16_t *w, uint16_t *h) 
 {
     uint8_t c; // Current character
 
@@ -1199,83 +872,31 @@ void Avnet_GFX::getTextBounds(const char *str, int16_t x, int16_t y, int16_t *x1
 }
 
 /*! --------------------------------------------------------------------------------
-    @brief    Helper to determine size of a string with current font/size. Pass string and a cursor position, returns UL corner and W,H.
-    @param    str    The ascii string to measure (as an arduino String() class)
-    @param    x      The current cursor X
-    @param    y      The current cursor Y
-    @param    x1     The boundary X coordinate, set by function
-    @param    y1     The boundary Y coordinate, set by function
-    @param    w      The boundary width, set by function
-    @param    h      The boundary height, set by function
-*/
-void Avnet_GFX::getTextBounds(const String &str, int16_t x, int16_t y, int16_t *x1, int16_t *y1, uint16_t *w, uint16_t *h) 
-{
-    if (str.length() != 0) {
-        getTextBounds(const_cast<char*>(str.c_str()), x, y, x1, y1, w, h);
-    }
-}
-
-
-/*! --------------------------------------------------------------------------------
-    @brief    Helper to determine size of a PROGMEM string with current font/size. Pass string and a cursor position, returns UL corner and W,H.
-    @param    str     The flash-memory ascii string to measure
-    @param    x       The current cursor X
-    @param    y       The current cursor Y
-    @param    x1      The boundary X coordinate, set by function
-    @param    y1      The boundary Y coordinate, set by function
-    @param    w      The boundary width, set by function
-    @param    h      The boundary height, set by function
-*/
-void Avnet_GFX::getTextBounds(const __FlashStringHelper *str, int16_t x, int16_t y, int16_t *x1, int16_t *y1, uint16_t *w, uint16_t *h) 
-{
-    uint8_t *s = (uint8_t *)str, c;
-
-    *x1 = x;
-    *y1 = y;
-    *w  = *h = 0;
-
-    int16_t minx = _width, miny = _height, maxx = -1, maxy = -1;
-
-    while((c = pgm_read_byte(s++)))
-        charBounds(c, &x, &y, &minx, &miny, &maxx, &maxy);
-
-    if(maxx >= minx) {
-        *x1 = minx;
-        *w  = maxx - minx + 1;
-    }
-    if(maxy >= miny) {
-        *y1 = miny;
-        *h  = maxy - miny + 1;
-    }
-}
-
-/*! --------------------------------------------------------------------------------
     @brief      Get width of the display, accounting for the current rotation
     @returns    Width in pixels
 */
-int16_t Avnet_GFX::width(void) const { return _width; }
+int16_t Avnet_GFX::width(void) { return _width; }
 
 /*! --------------------------------------------------------------------------------
     @brief      Get height of the display, accounting for the current rotation
     @returns    Height in pixels
 */
-int16_t Avnet_GFX::height(void) const { return _height; }
+int16_t Avnet_GFX::height(void) { return _height; }
 
 /*! --------------------------------------------------------------------------------
     @brief      Invert the display (ideally using built-in hardware command)
     @param   i  True if you want to invert, false to make 'normal'
 */
-void Avnet_GFX::invertDisplay(boolean i) { /* Do nothing, must be subclassed if supported by hardware */ }
+void Avnet_GFX::invertDisplay(bool i) { /* Do nothing, must be subclassed if supported by hardware */ }
 
 
 
 // -------------------------------------------------------------------------
 
-// GFXcanvas1, GFXcanvas8 and GFXcanvas16 (currently a WIP, don't get too
-// comfy with the implementation) provide 1-, 8- and 16-bit offscreen
-// canvases, the address of which can be passed to drawBitmap() or
-// pushColors() (the latter appears only in a couple of GFX-subclassed TFT
-// libraries at this time).  This is here mostly to help with the recently-
+// GFXcanvas1, 
+//  provide 1-bit offscreen canvases, the address of which can be passed to 
+// drawBitmap().
+// This is here mostly to help with the recently-
 // added proportionally-spaced fonts; adds a way to refresh a section of the
 // screen without a massive flickering clear-and-redraw...but maybe you'll
 // find other uses too.  VERY RAM-intensive, since the buffer is in MCU
@@ -1295,10 +916,7 @@ void Avnet_GFX::invertDisplay(boolean i) { /* Do nothing, must be subclassed if 
 */
 GFXcanvas1::GFXcanvas1(uint16_t w, uint16_t h) : Avnet_GFX(w, h) 
 {
-    uint16_t bytes = ((w + 7) / 8) * h;
-    if((buffer = (uint8_t *)malloc(bytes))) {
-        memset(buffer, 0, bytes);
-    }
+    fillScreen(BLACK);
 }
 
 /*! --------------------------------------------------------------------------------
@@ -1349,191 +967,13 @@ void GFXcanvas1::drawPixel(int16_t x, int16_t y, uint16_t color)
 
 /*! --------------------------------------------------------------------------------
    @brief    Fill the framebuffer completely with one color
-    @param    color 16-bit 5-6-5 Color to fill with
+   @param    color to fill with, WHITE/true=on, BLACK/false=off
 */
 void GFXcanvas1::fillScreen(uint16_t color) 
 {
     if(buffer) {
         uint16_t bytes = ((WIDTH + 7) / 8) * HEIGHT;
         memset(buffer, color ? 0xFF : 0x00, bytes);
-    }
-}
-
-/*! --------------------------------------------------------------------------------
-   @brief    Instatiate a GFX 8-bit canvas context for graphics
-   @param    w   Display width, in pixels
-   @param    h   Display height, in pixels
-*/
-GFXcanvas8::GFXcanvas8(uint16_t w, uint16_t h) : Avnet_GFX(w, h) 
-{
-    uint32_t bytes = w * h;
-    if((buffer = (uint8_t *)malloc(bytes))) {
-        memset(buffer, 0, bytes);
-    }
-}
-
-/*! --------------------------------------------------------------------------------
-   @brief    Delete the canvas, free memory
-*/
-GFXcanvas8::~GFXcanvas8(void) { if(buffer) free(buffer); }
-
-
-/*! --------------------------------------------------------------------------------
-   @brief    Get a pointer to the internal buffer memory
-   @returns  A pointer to the allocated buffer
-*/
-uint8_t* GFXcanvas8::getBuffer(void) { return buffer; }
-
-/*! --------------------------------------------------------------------------------
-   @brief    Draw a pixel to the canvas framebuffer
-    @param   x   x coordinate
-    @param   y   y coordinate
-   @param    color 16-bit 5-6-5 Color to fill with
-*/
-void GFXcanvas8::drawPixel(int16_t x, int16_t y, uint16_t color) 
-{
-    if(buffer) {
-        if((x < 0) || (y < 0) || (x >= _width) || (y >= _height)) return;
-
-        int16_t t;
-        switch(rotation) {
-            case 1:
-                t = x;
-                x = WIDTH  - 1 - y;
-                y = t;
-                break;
-            case 2:
-                x = WIDTH  - 1 - x;
-                y = HEIGHT - 1 - y;
-                break;
-            case 3:
-                t = x;
-                x = y;
-                y = HEIGHT - 1 - t;
-                break;
-        }
-
-        buffer[x + y * WIDTH] = color;
-    }
-}
-
-/*! --------------------------------------------------------------------------------
-   @brief    Fill the framebuffer completely with one color
-    @param    color 16-bit 5-6-5 Color to fill with
-*/
-void GFXcanvas8::fillScreen(uint16_t color) 
-{
-    if(buffer) {
-        memset(buffer, color, WIDTH * HEIGHT);
-    }
-}
-
-void GFXcanvas8::writeFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color) 
-{
-
-    if((x >= _width) || (y < 0) || (y >= _height)) return;
-    int16_t x2 = x + w - 1;
-    if(x2 < 0) return;
-
-    // Clip left/right
-    if(x < 0) {
-        x = 0;
-        w = x2 + 1;
-    }
-    if(x2 >= _width) w = _width - x;
-
-    int16_t t;
-    switch(rotation) {
-        case 1:
-            t = x;
-            x = WIDTH  - 1 - y;
-            y = t;
-            break;
-        case 2:
-            x = WIDTH  - 1 - x;
-            y = HEIGHT - 1 - y;
-            break;
-        case 3:
-            t = x;
-            x = y;
-            y = HEIGHT - 1 - t;
-            break;
-    }
-
-    memset(buffer + y * WIDTH + x, color, w);
-}
-
-/*! --------------------------------------------------------------------------------
-   @brief    Instatiate a GFX 16-bit canvas context for graphics
-   @param    w   Display width, in pixels
-   @param    h   Display height, in pixels
-*/
-GFXcanvas16::GFXcanvas16(uint16_t w, uint16_t h) : Avnet_GFX(w, h) 
-{
-    uint32_t bytes = w * h * 2;
-    if((buffer = (uint16_t *)malloc(bytes))) {
-        memset(buffer, 0, bytes);
-    }
-}
-
-/*! --------------------------------------------------------------------------------
-   @brief    Delete the canvas, free memory
-*/
-GFXcanvas16::~GFXcanvas16(void) { if(buffer) free(buffer); }
-
-/*! --------------------------------------------------------------------------------
-   @brief    Get a pointer to the internal buffer memory
-   @returns  A pointer to the allocated buffer
-*/
-uint16_t* GFXcanvas16::getBuffer(void) { return buffer; }
-
-/*! --------------------------------------------------------------------------------
-   @brief    Draw a pixel to the canvas framebuffer
-    @param   x   x coordinate
-    @param   y   y coordinate
-   @param    color 16-bit 5-6-5 Color to fill with
-*/
-void GFXcanvas16::drawPixel(int16_t x, int16_t y, uint16_t color) 
-{
-    if(buffer) {
-        if((x < 0) || (y < 0) || (x >= _width) || (y >= _height)) return;
-
-        int16_t t;
-        switch(rotation) {
-            case 1:
-                t = x;
-                x = WIDTH  - 1 - y;
-                y = t;
-                break;
-            case 2:
-                x = WIDTH  - 1 - x;
-                y = HEIGHT - 1 - y;
-                break;
-            case 3:
-                t = x;
-                x = y;
-                y = HEIGHT - 1 - t;
-                break;
-        }
-
-        buffer[x + y * WIDTH] = color;
-    }
-}
-
-/*! --------------------------------------------------------------------------------
-   @brief    Fill the framebuffer completely with one color
-    @param    color 16-bit 5-6-5 Color to fill with
-*/
-void GFXcanvas16::fillScreen(uint16_t color) 
-{
-    if(buffer) {
-        uint8_t hi = color >> 8, lo = color & 0xFF;
-        if(hi == lo) {
-            memset(buffer, lo, WIDTH * HEIGHT * 2);
-        } else {
-            uint32_t i, pixels = WIDTH * HEIGHT;
-            for(i=0; i<pixels; i++) buffer[i] = color;
-        }
     }
 }
 

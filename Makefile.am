@@ -34,7 +34,8 @@ clean-generic:
 
 azIoTClient_SOURCES = azIoTClient.cpp foa.cpp mal.cpp jsmn.c i2c_interface.cpp \
                       hts221.cpp azClientFuncs.cpp azure_certs.c prettyjson.cpp\
-                      lis2dw12.cpp button.cpp gps.cpp
+                      lis2dw12.cpp button.cpp gps.cpp Avnet_GFX.cpp oledb_ssd1306.cpp\
+                      ssd1306_96x39_spi.cpp
 
 noinst_LIBRARIES = libmsft_azure_iot_sdk.a libarmtls.a 
 
