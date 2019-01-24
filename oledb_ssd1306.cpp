@@ -27,7 +27,7 @@
     @param  h - Display height in pixels
 */
 OLEDB_SSD1306::OLEDB_SSD1306(uint8_t w, uint8_t h, gpio_pin_t rst_pin, gpio_pin_t dc_pin ) :
-  Avnet_GFX(w, h), buffer(NULL), rstPin(0), dcPin(0) 
+  Avnet_GFX(w, h), buffer(NULL), rstPin(0), dcPin(0), reverse_linescan(false)
 {
     gpio_init(rst_pin, &rstPin);
     gpio_write(rstPin,  GPIO_LEVEL_HIGH );                                  // RST is active low
@@ -68,8 +68,7 @@ int OLEDB_SSD1306::spi_write_one( uint16_t cmd, uint8_t b )
 
 /*!
     @brief Send a command to the SSD1306
-    @param cmd is either SSD1306_COMMAND or SSD1306_DATA depending of if the 
-    @param  buffer is commands or data being sent
+    @param cmd is either SSD1306_COMMAND or SSD1306_DATA depending of if commands or data being sent
     @param  b is a pointer to a buffer of data/commands
     @param  siz is the number of bytes in the buffer
     @return true on success, false otherwise.
@@ -105,9 +104,6 @@ bool OLEDB_SSD1306::init( bool reset )
 
         SSD1306_MEMORYMODE,                   // 0x20
         0x00,                                 // use Horizontal addressing mode
-#ifdef REVERSE_LINESCAN    
-        (SSD1306_SEGREMAP | 1),               // 0xA1 reverse line scan   
-#endif
         SSD1306_COMSCANDEC,                   // 0xC8
         SSD1306_SETCOMPINS,                   // 0xDA
         0x12,                                 // ada x12
@@ -131,15 +127,11 @@ bool OLEDB_SSD1306::init( bool reset )
 
     int x= spi_write_seq( SSD1306_COMMAND,  init_seq, sizeof(init_seq) );
 
-    clearDisplay();
-    display();
+    for( int i=0; i< (128 * ((96+7)/8)); i++) //clear all display RAM in the SSD1306   
+        spi_write_one(SSD1306_DATA, 0x00);
 
-//JMF
-printf("draw the splash screen\n");
-//  drawBitmap(0, 0, splash_data, splash_width, splash_height, 1);
-memcpy(buffer, splash_data, SSD1306_LCDWIDTH * ((SSD1306_LCDHEIGHT + 7) / 8));
-display();
-//JMF
+    clearDisplay();
+    display(false);
 
     return x;
 }
@@ -148,26 +140,37 @@ display();
 
 /*!
     @brief  Push data currently in RAM to SSD1306 display.
+    @param  if reverse_linescan is true print buffer in reverse else normal
     @return None 
     @note   Drawing operations not visible until this function is called. If 
             REVERSE_LINESCAN is defined, the scan occures in reversed.
 */
-void OLEDB_SSD1306::display(void) 
+void OLEDB_SSD1306::display(bool reverse_linescan) 
 {
-    uint8_t dlist[] = {
-        SSD1306_PAGEADDR,          // 0x22
-        0,                         // Page start address
-        (0xFF),                    // Page end (not really, but this works)
-        SSD1306_COLUMNADDR,        // 0x21
-#ifdef REVERSE_LINESCAN            // 127 is the SSD1306 column size, adjust for physical LCD dimensions)
-        (127-(SSD1306_LCDWIDTH-1)),// Column start address if reversed
-        (127)                      // Column end address
-#else
-        0,                         // Column start address
-        (SSD1306_LCDWIDTH-1)       // Column end address
-#endif
-        };
-    spi_write_seq( SSD1306_COMMAND,  dlist, sizeof(dlist) );
+    uint8_t dlistrev[] = {
+            (SSD1306_SEGREMAP | 1),    // 0xA1 reverse line scan   
+            SSD1306_PAGEADDR,          // 0x22
+            0,                         // Page start address
+            (0xFF),                    // Page end (not really, but this works)
+            SSD1306_COLUMNADDR,        // 0x21
+            (127-(SSD1306_LCDWIDTH-1)),// Column start address if reversed
+            (127)                      // Column end address
+            };
+    uint8_t dlistnom[] = {
+            (SSD1306_SEGREMAP),        // 0xA0 normal line scan   
+            SSD1306_PAGEADDR,          // 0x22
+            0,                         // Page start address
+            (0xFF),                    // Page end (not really, but this works)
+            SSD1306_COLUMNADDR,        // 0x21
+            0,                         // Column start address
+            (SSD1306_LCDWIDTH-1)       // Column end address
+            };
+
+
+    if( reverse_linescan ) 
+        spi_write_seq( SSD1306_COMMAND,  dlistrev, sizeof(dlistrev) );
+    else
+        spi_write_seq( SSD1306_COMMAND,  dlistnom, sizeof(dlistnom) );
 
     uint16_t count = SSD1306_LCDWIDTH * ((SSD1306_LCDHEIGHT + 7) / 8);
     uint8_t *ptr   = buffer;
@@ -185,7 +188,7 @@ void OLEDB_SSD1306::display(void)
 void OLEDB_SSD1306::startscrollright(uint8_t start, uint8_t stop) 
 {
     uint8_t scrollList[] = {
-        SSD1306_RIGHT_HORIZONTAL_SCROLL,
+        SSD1306_RIGHT_HORIZONTAL_SCROLL,  //0x26
         0X00,
         start,
         0X00,
@@ -207,7 +210,7 @@ void OLEDB_SSD1306::startscrollright(uint8_t start, uint8_t stop)
 void OLEDB_SSD1306::startscrollleft(uint8_t start, uint8_t stop) 
 {
     uint8_t scrollList[] = {
-        SSD1306_LEFT_HORIZONTAL_SCROLL,
+        SSD1306_LEFT_HORIZONTAL_SCROLL, //0x27
         0X00,
         start,
         0X00,
@@ -228,10 +231,10 @@ void OLEDB_SSD1306::startscrollleft(uint8_t start, uint8_t stop)
 void OLEDB_SSD1306::startscrolldiagright(uint8_t start, uint8_t stop) 
 {
     uint8_t scrollList[] = {
-        SSD1306_SET_VERTICAL_SCROLL_AREA,
+        SSD1306_SET_VERTICAL_SCROLL_AREA,              //0xA3
         0X00,
         SSD1306_LCDHEIGHT,
-        SSD1306_VERTICAL_AND_RIGHT_HORIZONTAL_SCROLL,
+        SSD1306_VERTICAL_AND_RIGHT_HORIZONTAL_SCROLL,  //0x29
         0X00,
         start,
         0X00,
@@ -239,7 +242,7 @@ void OLEDB_SSD1306::startscrolldiagright(uint8_t start, uint8_t stop)
         0X01,
         SSD1306_ACTIVATE_SCROLL 
         };
-  spi_write_seq( SSD1306_COMMAND,  scrollList, sizeof(scrollList) );
+    spi_write_seq( SSD1306_COMMAND,  scrollList, sizeof(scrollList) );
 }
 
 /*!
@@ -252,10 +255,10 @@ void OLEDB_SSD1306::startscrolldiagright(uint8_t start, uint8_t stop)
 void OLEDB_SSD1306::startscrolldiagleft(uint8_t start, uint8_t stop) 
 {
     uint8_t scrollList[] = {
-        SSD1306_SET_VERTICAL_SCROLL_AREA,
+        SSD1306_SET_VERTICAL_SCROLL_AREA,             //0xA3
         0X00,
         SSD1306_LCDHEIGHT,
-        SSD1306_VERTICAL_AND_LEFT_HORIZONTAL_SCROLL,
+        SSD1306_VERTICAL_AND_LEFT_HORIZONTAL_SCROLL,  //0x2A
         0X00,
         start,
         0X00,

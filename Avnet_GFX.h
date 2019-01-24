@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include "gfxfont.h"
 
 #define BLACK 0
 #define WHITE 1
@@ -55,7 +54,6 @@ class Avnet_GFX {
   void    setTextSize(uint8_t s);
   void    setTextWrap(bool w);
   void    cp437(bool x=true);
-  void    setFont(GFXfont *f);
   size_t  printText(const char *fmt, ...);
   void getTextBounds(char *string, int16_t x, int16_t y, int16_t *x1, int16_t *y1, uint16_t *w, uint16_t *h);
 
@@ -82,7 +80,6 @@ class Avnet_GFX {
   uint8_t       rotation;       ///< Display rotation (0 thru 3)
   bool          wrap;           ///< If set, 'wrap' text at right edge of display
   bool         _cp437;         ///< If set, use correct CP437 charset (default is off)
-  GFXfont       *gfxFont;       ///< Pointer to special font
 };
 
 

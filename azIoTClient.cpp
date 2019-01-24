@@ -229,6 +229,8 @@ void verbose_output( const char * format, ... )
 
 void testOLED(void)
 {
+    void do_oled_test(void);
+    do_oled_test();
 }
 
 void chk_uart2_input(void) {
@@ -282,7 +284,7 @@ int main(int argc, char *argv[])
     while((i=getopt(argc,argv,"tuvr:?")) != -1 )
         switch(i) {
            case 't':
-               printf("Testing OLED-B MicroE Click Board.");
+               printf("Testing OLED-B MicroE Click Board.\n");
                testOLED();
                exit(EXIT_SUCCESS);
 

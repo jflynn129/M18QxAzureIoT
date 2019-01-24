@@ -28,7 +28,6 @@ WIDTH(w), HEIGHT(h)
     textcolor = textbgcolor = 0xFFFF;
     wrap      = true;
     _cp437    = false;
-    gfxFont   = NULL;
 }
 
 /*! --------------------------------------------------------------------------------
@@ -644,96 +643,38 @@ void Avnet_GFX::drawGrayscaleBitmap(int16_t x, int16_t y, uint8_t *bitmap, uint8
 */
 void Avnet_GFX::drawChar(int16_t x, int16_t y, unsigned char c, uint16_t color, uint16_t bg, uint8_t size) 
 {
+    if((x >= _width)            || // Clip right
+       (y >= _height)           || // Clip bottom
+       ((x + 6 * size - 1) < 0) || // Clip left
+       ((y + 8 * size - 1) < 0))   // Clip top
+        return;
 
-    if(!gfxFont) { // 'Classic' built-in font
+    if(!_cp437 && (c >= 176)) c++; // Handle 'classic' charset behavior
 
-        if((x >= _width)            || // Clip right
-           (y >= _height)           || // Clip bottom
-           ((x + 6 * size - 1) < 0) || // Clip left
-           ((y + 8 * size - 1) < 0))   // Clip top
-            return;
-
-        if(!_cp437 && (c >= 176)) c++; // Handle 'classic' charset behavior
-
-        for(int8_t i=0; i<5; i++ ) { // Char bitmap = 5 columns
-            uint8_t line = (font[c * 5 + i]);
-            for(int8_t j=0; j<8; j++, line >>= 1) {
-                if(line & 1) {
-                    if(size == 1)
-                        writePixel(x+i, y+j, color);
-                    else
-                        writeFillRect(x+i*size, y+j*size, size, size, color);
-                } else if(bg != color) {
-                    if(size == 1)
-                        writePixel(x+i, y+j, bg);
-                    else
-                        writeFillRect(x+i*size, y+j*size, size, size, bg);
+    for(int8_t i=0; i<5; i++ ) { // Char bitmap = 5 columns
+        uint8_t line = (font[c * 5 + i]);
+        for(int8_t j=0; j<8; j++, line >>= 1) {
+            if(line & 1) {
+                if(size == 1)
+                    writePixel(x+i, y+j, color);
+                else
+                    writeFillRect(x+i*size, y+j*size, size, size, color);
+                } 
+            else if(bg != color) {
+                if(size == 1)
+                    writePixel(x+i, y+j, bg);
+                else
+                    writeFillRect(x+i*size, y+j*size, size, size, bg);
                 }
             }
         }
         if(bg != color) { // If opaque, draw vertical line for last column
-            if(size == 1) writeFastVLine(x+5, y, 8, bg);
-            else          writeFillRect(x+5*size, y, size, 8*size, bg);
+            if(size == 1) 
+                writeFastVLine(x+5, y, 8, bg);
+            else 
+                writeFillRect(x+5*size, y, size, 8*size, bg);
         }
 
-    } else { // Custom font
-
-        // Character is assumed previously filtered by write() to eliminate
-        // newlines, returns, non-printable characters, etc.  Calling
-        // drawChar() directly with 'bad' characters of font may cause mayhem!
-
-        c -= (uint8_t)(gfxFont->first);
-        GFXglyph *glyph  = &(((GFXglyph *)(&gfxFont->glyph))[c]);
-        uint8_t  *bitmap = (uint8_t *)(&gfxFont->bitmap);
-
-        uint16_t bo = (glyph->bitmapOffset);
-        uint8_t  w  = (glyph->width),
-                 h  = (glyph->height);
-        int8_t   xo = (glyph->xOffset),
-                 yo = (glyph->yOffset);
-        uint8_t  xx, yy, bits = 0, bit = 0;
-        int16_t  xo16 = 0, yo16 = 0;
-
-        if(size > 1) {
-            xo16 = xo;
-            yo16 = yo;
-        }
-
-        // Todo: Add character clipping here
-
-        // NOTE: THERE IS NO 'BACKGROUND' COLOR OPTION ON CUSTOM FONTS.
-        // THIS IS ON PURPOSE AND BY DESIGN.  The background color feature
-        // has typically been used with the 'classic' font to overwrite old
-        // screen contents with new data.  This ONLY works because the
-        // characters are a uniform size; it's not a sensible thing to do with
-        // proportionally-spaced fonts with glyphs of varying sizes (and that
-        // may overlap).  To replace previously-drawn text when using a custom
-        // font, use the getTextBounds() function to determine the smallest
-        // rectangle encompassing a string, erase the area with fillRect(),
-        // then draw new text.  This WILL infortunately 'blink' the text, but
-        // is unavoidable.  Drawing 'background' pixels will NOT fix this,
-        // only creates a new set of problems.  Have an idea to work around
-        // this (a canvas object type for MCUs that can afford the RAM and
-        // displays supporting setAddrWindow() and pushColors()), but haven't
-        // implemented this yet.
-
-        for(yy=0; yy<h; yy++) {
-            for(xx=0; xx<w; xx++) {
-                if(!(bit++ & 7)) {
-                    bits = (bitmap[bo++]);
-                }
-                if(bits & 0x80) {
-                    if(size == 1) {
-                        writePixel(x+xo+xx, y+yo+yy, color);
-                    } else {
-                        writeFillRect(x+(xo16+xx)*size, y+(yo16+yy)*size, size, size, color);
-                    }
-                }
-                bits <<= 1;
-            }
-        }
-
-    } // End classic vs custom font
 }
 
 /*! --------------------------------------------------------------------------------
@@ -742,47 +683,18 @@ void Avnet_GFX::drawChar(int16_t x, int16_t y, unsigned char c, uint16_t color, 
 */
 size_t Avnet_GFX::write(uint8_t c) 
 {
-    if(!gfxFont) { // 'Classic' built-in font
-
-        if(c == '\n') {                        // Newline?
-            cursor_x  = 0;                     // Reset x to zero,
-            cursor_y += textsize * 8;          // advance y one line
-        } else if(c != '\r') {                 // Ignore carriage returns
-            if(wrap && ((cursor_x + textsize * 6) > _width)) { // Off right?
-                cursor_x  = 0;                 // Reset x to zero,
-                cursor_y += textsize * 8;      // advance y one line
+    if(c == '\n') {                        // Newline?
+        cursor_x  = 0;                     // Reset x to zero,
+        cursor_y += (textsize * 8);        // advance y one line
+        } 
+    else if(c != '\r') {                 // Ignore carriage returns
+        if(wrap && ((cursor_x + textsize * 6) > _width)) { // Off right?
+            cursor_x  = 0;                 // Reset x to zero,
+            cursor_y += textsize * 8;      // advance y one line
             }
-            drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize);
-            cursor_x += textsize * 6;          // Advance x one char
+        drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize);
+        cursor_x += textsize * 6;          // Advance x one char
         }
-
-    } else { // Custom font
-
-        if(c == '\n') {
-            cursor_x  = 0;
-            cursor_y += (int16_t)textsize *
-                        (uint8_t)(gfxFont->yAdvance);
-        } else if(c != '\r') {
-            uint8_t first = (gfxFont->first);
-            if((c >= first) && (c <= (uint8_t)(gfxFont->last))) {
-                GFXglyph *glyph = &(((GFXglyph *)(
-                  &gfxFont->glyph))[c - first]);
-                uint8_t   w     = (glyph->width),
-                          h     = (glyph->height);
-                if((w > 0) && (h > 0)) { // Is there an associated bitmap?
-                    int16_t xo = (int8_t)(glyph->xOffset); // sic
-                    if(wrap && ((cursor_x + textsize * (xo + w)) > _width)) {
-                        cursor_x  = 0;
-                        cursor_y += (int16_t)textsize *
-                          (uint8_t)(gfxFont->yAdvance);
-                    }
-                    drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize);
-                }
-                cursor_x += (uint8_t)(glyph->xAdvance) * (int16_t)textsize;
-            }
-        }
-
-    }
     return 1;
 }
 
@@ -793,7 +705,7 @@ size_t  Avnet_GFX::printText(const char *fmt, ...)
     va_start(ap, fmt);
     vsprintf (buff,fmt, ap);
     for( size_t i=0; i<strlen(buff); i++ )
-        write(buff[0]);
+        write(buff[i]);
     va_end(ap);
     return strlen(buff);
 }
@@ -832,6 +744,19 @@ void Avnet_GFX::setTextColor(uint16_t c)
     // For 'transparent' background, we'll set the bg
     // to the same as fg instead of using a flag
     textcolor = textbgcolor = c;
+}
+
+/*! --------------------------------------------------------------------------------
+    @brief   Set text font color with transparant background
+    @param   c   16-bit 5-6-5 Color to draw text with
+    @param   b   16-bit 5-6-5 Color to draw text with
+*/
+void Avnet_GFX::setTextColor(uint16_t c, uint16_t b) 
+{
+    // For 'transparent' background, we'll set the bg
+    // to the same as fg instead of using a flag
+    textcolor  = c; 
+    textbgcolor= b;
 }
 
 /*! --------------------------------------------------------------------------------
@@ -879,26 +804,6 @@ void Avnet_GFX::setRotation(uint8_t x)
 */
 void Avnet_GFX::cp437(bool x) { _cp437 = x; }
 
-/*! --------------------------------------------------------------------------------
-    @brief Set the font to display when print()ing, either custom or default
-    @param  f  The GFXfont object, if NULL use built in 6x8 font
-*/
-void Avnet_GFX::setFont(GFXfont *f) 
-{
-    if(f) {            // Font struct pointer passed in?
-        if(!gfxFont) { // And no current font struct?
-            // Switching from classic to new font behavior.
-            // Move cursor pos down 6 pixels so it's on baseline.
-            cursor_y += 6;
-        }
-    } else if(gfxFont) { // NULL passed.  Current font struct defined?
-        // Switching from new to classic font behavior.
-        // Move cursor pos up 6 pixels so it's at top-left of char.
-        cursor_y -= 6;
-    }
-    gfxFont = (GFXfont *)f;
-}
-
 
 /*! --------------------------------------------------------------------------------
     @brief    Helper to determine size of a character with current font/size.
@@ -913,59 +818,23 @@ void Avnet_GFX::setFont(GFXfont *f)
 */
 void Avnet_GFX::charBounds(char c, int16_t *x, int16_t *y, int16_t *minx, int16_t *miny, int16_t *maxx, int16_t *maxy) 
 {
-
-    if(gfxFont) {
-
-        if(c == '\n') { // Newline?
-            *x  = 0;    // Reset x to zero, advance y by one line
-            *y += textsize * (uint8_t)(gfxFont->yAdvance);
-        } else if(c != '\r') { // Not a carriage return; is normal char
-            uint8_t first = (gfxFont->first),
-                    last  = (gfxFont->last);
-            if((c >= first) && (c <= last)) { // Char present in this font?
-                GFXglyph *glyph = &(((GFXglyph *)(
-                  &gfxFont->glyph))[c - first]);
-                uint8_t gw = (glyph->width),
-                        gh = (glyph->height),
-                        xa = (glyph->xAdvance);
-                int8_t  xo = (glyph->xOffset),
-                        yo = (glyph->yOffset);
-                if(wrap && ((*x+(((int16_t)xo+gw)*textsize)) > _width)) {
-                    *x  = 0; // Reset x to zero, advance y by one line
-                    *y += textsize * (uint8_t)(gfxFont->yAdvance);
-                }
-                int16_t ts = (int16_t)textsize,
-                        x1 = *x + xo * ts,
-                        y1 = *y + yo * ts,
-                        x2 = x1 + gw * ts - 1,
-                        y2 = y1 + gh * ts - 1;
-                if(x1 < *minx) *minx = x1;
-                if(y1 < *miny) *miny = y1;
-                if(x2 > *maxx) *maxx = x2;
-                if(y2 > *maxy) *maxy = y2;
-                *x += xa * ts;
+    if(c == '\n') {                     // Newline?
+        *x  = 0;                        // Reset x to zero,
+        *y += textsize * 8;             // advance y one line
+        // min/max x/y unchaged -- that waits for next 'normal' character
+        } 
+    else if(c != '\r') {  // Normal char; ignore carriage returns
+        if(wrap && ((*x + textsize * 6) > _width)) { // Off right?
+            *x  = 0;                    // Reset x to zero,
+            *y += textsize * 8;         // advance y one line
             }
-        }
-
-    } else { // Default font
-
-        if(c == '\n') {                     // Newline?
-            *x  = 0;                        // Reset x to zero,
-            *y += textsize * 8;             // advance y one line
-            // min/max x/y unchaged -- that waits for next 'normal' character
-        } else if(c != '\r') {  // Normal char; ignore carriage returns
-            if(wrap && ((*x + textsize * 6) > _width)) { // Off right?
-                *x  = 0;                    // Reset x to zero,
-                *y += textsize * 8;         // advance y one line
-            }
-            int x2 = *x + textsize * 6 - 1, // Lower-right pixel of char
-                y2 = *y + textsize * 8 - 1;
-            if(x2 > *maxx) *maxx = x2;      // Track max x, y
-            if(y2 > *maxy) *maxy = y2;
-            if(*x < *minx) *minx = *x;      // Track min x, y
-            if(*y < *miny) *miny = *y;
-            *x += textsize * 6;             // Advance x one char
-        }
+        int x2 = *x + textsize * 6 - 1; // Lower-right pixel of char
+        int y2 = *y + textsize * 8 - 1;
+        if(x2 > *maxx) *maxx = x2;      // Track max x, y
+        if(y2 > *maxy) *maxy = y2;
+        if(*x < *minx) *minx = *x;      // Track min x, y
+        if(*y < *miny) *miny = *y;
+        *x += textsize * 6;             // Advance x one char
     }
 }
 

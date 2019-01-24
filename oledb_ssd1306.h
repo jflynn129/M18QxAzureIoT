@@ -75,7 +75,7 @@ class OLEDB_SSD1306 : public Avnet_GFX {
     ~OLEDB_SSD1306(void);
 
     bool           init( bool reset );
-    void           display(void);
+    void           display(bool reverse);
     void           clearDisplay(void);
     void           invertDisplay(bool i);
     void           dim(bool dim);
@@ -101,6 +101,7 @@ class OLEDB_SSD1306 : public Avnet_GFX {
     uint8_t        *buffer;
     gpio_handle_t  rstPin;
     gpio_handle_t  dcPin;
+    bool           reverse_linescan;
 };
 
 #endif // _OLEDB_SSD1306_hpp_

@@ -3,6 +3,7 @@
 #include <oledb_ssd1306.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define SCREEN_WIDTH  96 // OLED display width, in pixels
 #define SCREEN_HEIGHT 39 // OLED display height, in pixels
@@ -13,7 +14,7 @@
 //GPIO_PIN_95 = reset for click module #2
 //GPIO_PIN_2 = reset for click module #1
 
-OLEDB_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, GPIO_PIN_95, GPIO_PIN_96);
+OLEDB_SSD1306 display(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT, GPIO_PIN_95, GPIO_PIN_96);
 
 #define NUMFLAKES     10 // Number of snowflakes in the animation example
 
@@ -46,52 +47,52 @@ void testdrawline()
 
   for(i=0; i<display.width(); i+=4) {
     display.drawLine(0, 0, i, display.height()-1, WHITE);
-    display.display(); // Update screen with each newly-drawn line
-    sleep(2);
+    display.display(false); // Update screen with each newly-drawn line
+    delay(100);
   }
   for(i=0; i<display.height(); i+=4) {
     display.drawLine(0, 0, display.width()-1, i, WHITE);
-    display.display();
-    sleep(2);
+    display.display(false);
+    delay(100);
   }
 
   display.clearDisplay();
 
   for(i=0; i<display.width(); i+=4) {
     display.drawLine(0, display.height()-1, i, 0, WHITE);
-    display.display();
-    sleep(2);
+    display.display(false);
+    delay(100);
   }
   for(i=display.height()-1; i>=0; i-=4) {
     display.drawLine(0, display.height()-1, display.width()-1, i, WHITE);
-    display.display();
-    sleep(2);
+    display.display(false);
+    delay(100);
   }
 
   display.clearDisplay();
 
   for(i=display.width()-1; i>=0; i-=4) {
     display.drawLine(display.width()-1, display.height()-1, i, 0, WHITE);
-    display.display();
-    sleep(2);
+    display.display(false);
+    delay(100);
   }
   for(i=display.height()-1; i>=0; i-=4) {
     display.drawLine(display.width()-1, display.height()-1, 0, i, WHITE);
-    display.display();
-    sleep(2);
+    display.display(false);
+    delay(100);
   }
 
   display.clearDisplay();
 
   for(i=0; i<display.height(); i+=4) {
     display.drawLine(display.width()-1, 0, 0, i, WHITE);
-    display.display();
-    sleep(2);
+    display.display(false);
+    delay(100);
   }
   for(i=0; i<display.width(); i+=4) {
     display.drawLine(display.width()-1, 0, i, display.height()-1, WHITE);
-    display.display();
-    sleep(2);
+    display.display(false);
+    delay(100);
   }
 
   sleep(2); // Pause for 2 seconds
@@ -103,8 +104,8 @@ void testdrawrect(void)
 
   for(int16_t i=0; i<display.height()/2; i+=2) {
     display.drawRect(i, i, display.width()-2*i, display.height()-2*i, WHITE);
-    display.display(); // Update screen with each newly-drawn rectangle
-    sleep(1);
+    display.display(false); // Update screen with each newly-drawn rectangle
+    delay(500);
   }
 
   sleep(2);
@@ -114,11 +115,11 @@ void testfillrect(void)
 {
   display.clearDisplay();
 
-  for(int16_t i=0; i<display.height()/2; i+=3) {
+  for(int16_t i=0; i<display.height()/2; i+=1/*3*/) {
     // The INVERSE color is used so rectangles alternate white/black
     display.fillRect(i, i, display.width()-i*2, display.height()-i*2, INVERSE);
-    display.display(); // Update screen with each newly-drawn rectangle
-    sleep(1);
+    display.display(false); // Update screen with each newly-drawn rectangle
+    delay(500);
   }
 
   sleep(2);
@@ -130,8 +131,8 @@ void testdrawcircle(void)
 
   for(int16_t i=0; i<max(display.width(),display.height())/2; i+=2) {
     display.drawCircle(display.width()/2, display.height()/2, i, WHITE);
-    display.display();
-    sleep(1);
+    display.display(false);
+    delay(500);
   }
 
   sleep(2);
@@ -141,11 +142,11 @@ void testfillcircle(void)
 {
   display.clearDisplay();
 
-  for(int16_t i=max(display.width(),display.height())/2; i>0; i-=3) {
+  for(int16_t i=max(display.width(),display.height())/2-3; i>0; i-=2 /*3*/) {
     // The INVERSE color is used so circles alternate white/black
     display.fillCircle(display.width() / 2, display.height() / 2, i, INVERSE);
-    display.display(); // Update screen with each newly-drawn circle
-    sleep(1);
+    display.display(false); // Update screen with each newly-drawn circle
+    delay(500);
   }
 
   sleep(2);
@@ -155,11 +156,11 @@ void testdrawroundrect(void)
 {
   display.clearDisplay();
 
-  for(int16_t i=0; i<display.height()/2-2; i+=2) {
+  for(int16_t i=0; i<display.height()/2-3; i+=2) {
     display.drawRoundRect(i, i, display.width()-2*i, display.height()-2*i,
       display.height()/4, WHITE);
-    display.display();
-    sleep(1);
+    display.display(false);
+    delay(500);
   }
 
   sleep(2);
@@ -169,12 +170,12 @@ void testfillroundrect(void)
 {
   display.clearDisplay();
 
-  for(int16_t i=0; i<display.height()/2-2; i+=2) {
+  for(int16_t i=0; i<display.height()/2-3; i+=2) {
     // The INVERSE color is used so round-rects alternate white/black
     display.fillRoundRect(i, i, display.width()-2*i, display.height()-2*i,
       display.height()/4, INVERSE);
-    display.display();
-    sleep(1);
+    display.display(false);
+    delay(500);
   }
 
   sleep(2);
@@ -189,8 +190,8 @@ void testdrawtriangle(void)
       display.width()/2  , display.height()/2-i,
       display.width()/2-i, display.height()/2+i,
       display.width()/2+i, display.height()/2+i, WHITE);
-    display.display();
-    sleep(1);
+    display.display(false);
+    delay(500);
   }
 
   sleep(2);
@@ -200,14 +201,14 @@ void testfilltriangle(void)
 {
   display.clearDisplay();
 
-  for(int16_t i=max(display.width(),display.height())/2; i>0; i-=5) {
+  for(int16_t i=max(display.width(),display.height())/2; i>0; i-=2 /*5*/) {
     // The INVERSE color is used so triangles alternate white/black
     display.fillTriangle(
       display.width()/2  , display.height()/2-i,
       display.width()/2-i, display.height()/2+i,
       display.width()/2+i, display.height()/2+i, INVERSE);
-    display.display();
-    sleep(1);
+    display.display(false);
+    delay(500);
   }
 
   sleep(2);
@@ -218,7 +219,7 @@ void testdrawchar(void)
   display.clearDisplay();
 
   display.setTextSize(1);      // Normal 1:1 pixel scale
-//  display.setTextColor(WHITE); // Draw white text
+  display.setTextColor(WHITE); // Draw white text
   display.setCursor(0, 0);     // Start at top-left corner
   display.cp437(true);         // Use full 256 char 'Code Page 437' font
 
@@ -229,7 +230,7 @@ void testdrawchar(void)
     else          display.write(i);
   }
 
-  display.display();
+  display.display(true);
   sleep(2);
 }
 
@@ -238,38 +239,40 @@ void testdrawstyles(void)
   display.clearDisplay();
 
   display.setTextSize(1);             // Normal 1:1 pixel scale
-//  display.setTextColor(WHITE);        // Draw white text
+  display.setTextColor(WHITE);        // Draw white text
   display.setCursor(0,0);             // Start at top-left corner
-//  display.println(F("Hello, world!"));
+  display.printText("Hello, World!\n");
 
-//  display.setTextColor(BLACK, WHITE); // Draw 'inverse' text
-//  display.println(3.141592);
+  display.setTextColor(BLACK, WHITE); // Draw 'inverse' text
+  display.printText("%1.4f\n",3.141592);
 
   display.setTextSize(2);             // Draw 2X-scale text
-//  display.setTextColor(WHITE);
-//  display.print(F("0x")); display.println(0xDEADBEEF, HEX);
+  display.setTextColor(WHITE);
+  display.printText("%8X",0xDEADBEEF);
 
-  display.display();
-  sleep(2);
+  display.display(true);
+  sleep(4);
+  display.clearDisplay();
 }
 
 void testscrolltext(void) 
 {
   display.clearDisplay();
+  display.display(false);
 
-  display.setTextSize(2); // Draw 2X-scale text
-//  display.setTextColor(WHITE);
-  display.setCursor(10, 0);
-//  display.println(F("scroll"));
-  display.display();      // Show initial text
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 5);
+  display.printText("scroll...");
+  display.display(true);      // Show initial text
   delay(100);
 
   // Scroll in various directions, pausing in-between:
-  display.startscrollright(0x00, 0x0F);
+  display.startscrollright(0x00, 0x07);
   sleep(2);
   display.stopscroll();
   sleep(1);
-  display.startscrollleft(0x00, 0x0F);
+  display.startscrollleft(0x00, 0x07);
   sleep(2);
   display.stopscroll();
   sleep(1);
@@ -289,52 +292,39 @@ void testdrawbitmap(void)
     (display.width()  - LOGO_WIDTH ) / 2,
     (display.height() - LOGO_HEIGHT) / 2,
     logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-  display.display();
-  delay(1);
+  display.display(true);
 }
 
-#define XPOS   0 // Indexes into the 'icons' array in function below
+#define XPOS   0   // Indexes into the 'icons' array in function below
 #define YPOS   1
 #define DELTAY 2
 
 void testanimate(uint8_t *bitmap, uint8_t w, uint8_t h) 
 {
-  int8_t f, icons[NUMFLAKES][3];
+    int8_t f, t, icons[NUMFLAKES][3];
 
-  // Initialize 'snowflake' positions
-  for(f=0; f< NUMFLAKES; f++) {
-//    icons[f][XPOS]   = random(1 - LOGO_WIDTH, display.width());
-    icons[f][YPOS]   = -LOGO_HEIGHT;
-//    icons[f][DELTAY] = random(1, 6);
-//    print(F("x: "));
-//    print(icons[f][XPOS], DEC);
-//    print(F(" y: "));
-//    print(icons[f][YPOS], DEC);
-//    print(F(" dy: "));
-//    println(icons[f][DELTAY], DEC);
-  }
-
-    display.clearDisplay(); // Clear the display buffer
-
-    // Draw each snowflake:
+    // Initialize 'snowflake' positions
     for(f=0; f< NUMFLAKES; f++) {
-      display.drawBitmap(icons[f][XPOS], icons[f][YPOS], bitmap, w, h, WHITE);
-    }
+        icons[f][XPOS]   = rand() % ((1 - LOGO_WIDTH) + display.width());
+        icons[f][YPOS]   = rand() % ((1-LOGO_HEIGHT)  + display.height());
+        icons[f][DELTAY] = rand() % (display.height() - LOGO_HEIGHT);
+        }
 
-    display.display(); // Show the display buffer on the screen
-    delay(200);        // Pause for 1/10 second
-
-    // Then update coordinates of each flake...
-    for(f=0; f< NUMFLAKES; f++) {
-      icons[f][YPOS] += icons[f][DELTAY];
-      // If snowflake is off the bottom of the screen...
-      if (icons[f][YPOS] >= display.height()) {
-        // Reinitialize to a random position, just off the top
-//        icons[f][XPOS]   = random(1 - LOGO_WIDTH, display.width());
-        icons[f][YPOS]   = -LOGO_HEIGHT;
-//        icons[f][DELTAY] = random(1, 6);
-      }
-    }
+      display.clearDisplay(); // Clear the display buffer
+      for(int i=0; i<10; i++) {
+          // Then update coordinates of each flake...
+          for(f=0; f< NUMFLAKES; f++) {
+              icons[f][YPOS] += icons[f][DELTAY];
+              if (icons[f][YPOS] >= display.height()) {   // If snowflake is off the bottom of the screen...
+                  icons[f][YPOS]   = 0;
+                  }
+              display.clearDisplay(); // Clear the display buffer
+              display.drawBitmap(icons[f][XPOS], icons[f][YPOS], bitmap, w, h, WHITE);
+              display.display(true); // Show the display buffer on the screen
+              icons[f][DELTAY] = rand() % ((LOGO_HEIGHT/2)+LOGO_HEIGHT);
+              delay(150);        // Pause for 1/10 second
+              }
+          }
 }
 
 
@@ -342,15 +332,12 @@ void do_oled_test() {
 
   printf("Running OLED test...\n");
 
-
   printf("clear the display buffer\n");
   display.clearDisplay();
 
-  sleep(2); // Pause for 2 seconds
-
   printf("Draw a single pixel in white\n");
-  display.drawPixel(10, 10, WHITE);
-  display.display();
+  display.drawPixel(48, 18, WHITE);
+  display.display(false);
   sleep(2);
 
   printf("Draw many lines\n");
@@ -380,16 +367,9 @@ void do_oled_test() {
   printf("Draw triangles (filled)\n");
   testfilltriangle();  // Draw triangles (filled)
 
-  printf("Invert display\n");
-  // Invert and restore display, pausing in-between
-  display.invertDisplay(true);
-  sleep(2);
+  display.clearDisplay();
+  display.display(false);
 
-  printf("Restore display\n");
-  display.invertDisplay(false);
-  sleep(2);
-
-#if 0
   printf("Draw characters of the default font\n");
   testdrawchar();      // Draw characters of the default font
 
@@ -400,9 +380,25 @@ void do_oled_test() {
   testscrolltext();    // Draw scrolling text
 
   printf("Draw a small bitmap image\n");
-  testdrawbitmap();    // Draw a small bitmap image
+  testdrawbitmap();
+  sleep(5);
 
+  printf("Invert display\n");
+  display.invertDisplay(true);
+  sleep(2);
+
+  printf("Restore display\n");
+  display.invertDisplay(false);
+  sleep(2);
+
+  printf("Animation \n");
   testanimate(logo_bmp, LOGO_WIDTH, LOGO_HEIGHT); // Animate bitmaps
-#endif
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);        // Draw white text
+  display.setCursor(0,0);             // Start at top-left corner
+  display.printText("All Done!\n---------");
+  display.display(true);
 }
 
