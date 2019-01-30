@@ -17,7 +17,7 @@
 #define __AZIOTCLIENT_H__
 
 
-#define APP_VERSION             "1.2"
+#define APP_VERSION             "1.3"
 #define REPORT_PERIOD_RESOLUTION 10  //minimum reporting period in seconds 
 
 #define IOT_AGENT_OK CODEFIRST_OK  //Microsoft code bug...
