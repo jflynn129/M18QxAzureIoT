@@ -10,6 +10,7 @@ AM_CPPFLAGS = -I ./msft_azure_iot_sdk/azure-iot-sdk-c/c-utility/inc/ \
            -I ./msft_azure_iot_sdk/azure-iot-sdk-c/deps/parson/ \
            -I ./msft_azure_iot_sdk/azure-iot-sdk-c/serializer/inc/ \
            -I ./msft_azure_iot_sdk/azure-iot-sdk-c/platform/ \
+           -I ./msft_azure_iot_sdk/platform/ \
            -I ./mbedtls/include/ \
            -O2 -Wall -static -fno-short-enums \
            -Wl,--unresolved-symbols=ignore-in-shared-libs 
@@ -128,7 +129,7 @@ libmsft_azure_iot_sdk_a_SOURCES = ./msft_azure_iot_sdk/azure-iot-sdk-c/iothub_cl
                                   ./msft_azure_iot_sdk/azure-iot-sdk-c/umqtt/src/mqtt_message.c \
                                   ./msft_azure_iot_sdk/azure-iot-sdk-c/c-utility/adapters/tickcounter_linux.c  \
                                   ./msft_azure_iot_sdk/azure-iot-sdk-c/c-utility/adapters/linux_time.c \
-                                  ./msft_azure_iot_sdk/platform/tlsio_mbedtls.c \
+                                  ./msft_azure_iot_sdk/azure-iot-sdk-c/c-utility/adapters/tlsio_mbedtls.c \
                                   ./msft_azure_iot_sdk/platform/platform_linux.c  
 
 

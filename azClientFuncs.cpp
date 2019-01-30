@@ -3,16 +3,8 @@
 * SPDX-License-Identifier: MIT
 */
 
-
-//#define USE_MQTT //define USE_MQTT to use MQTT, otherwise it will use HTTP
-
 #include <stdlib.h>
 
-#ifdef USE_MQTT
-#include "iothubtransportmqtt.h"
-#else
-#include "iothubtransporthttp.h"
-#endif
 #include "iothub_client_core_common.h"
 #include "iothub_client_ll.h"
 #include "azure_c_shared_utility/platform.h"
@@ -29,6 +21,12 @@
 #include "azure_certs.h"
 
 #include "azIoTClient.h"
+
+#ifdef USE_MQTT
+#include "iothubtransportmqtt.h"
+#else
+#include "iothubtransporthttp.h"
+#endif
 
 //The following connection string must be updated for the individual users Azure IoT Device
 //static const char* connectionString = "HostName=XXXX;DeviceId=xxxx;SharedAccessKey=xxxx";

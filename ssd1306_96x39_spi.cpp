@@ -301,7 +301,7 @@ void testdrawbitmap(void)
 
 void testanimate(uint8_t *bitmap, uint8_t w, uint8_t h) 
 {
-    int8_t f, t, icons[NUMFLAKES][3];
+    int8_t f, icons[NUMFLAKES][3];
 
     // Initialize 'snowflake' positions
     for(f=0; f< NUMFLAKES; f++) {
