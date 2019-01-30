@@ -22,6 +22,8 @@
 
 #define IOT_AGENT_OK CODEFIRST_OK  //Microsoft code bug...
 
+#define USE_MQTT                   //define USE_MQTT to use MQTT, otherwise it will use HTTP
+
 #define BAROMETER_CLICK          0x01
 #define HTS221_CLICK             0x02
 #define RELAY_CLICK              0x04

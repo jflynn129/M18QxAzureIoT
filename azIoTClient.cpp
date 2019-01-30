@@ -337,6 +337,11 @@ int main(int argc, char *argv[])
     printf("\r\n");
     printf("This program uses the AT&T IoT Starter Kit, M18QWG (Global)/M18Q2FG-1 (North America) SoC \r\n");
     printf("and interacts with Azure IoTHub sending sensor data and receiving messeages.\r\n");
+    #ifdef USE_MQTT
+    printf(" >>using MQTT as the transport protocol<<\r\n");
+    #else
+    printf(" >>using HTTP as the transport protocol<<\r\n");
+    #endif
     printf("\r\n");
 
     status_led.action(Led::LED_BLINK,Led::RED);
